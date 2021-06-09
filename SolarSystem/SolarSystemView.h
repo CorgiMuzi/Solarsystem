@@ -19,14 +19,6 @@ public:
 	HDC m_hDC;  // Windows 버전의 Device Context
 	HGLRC m_hglRC; // OpenGL 버전의 Device Context
 
-	int m_texNum;
-	CWordArray m_globTexture;
-	int m_view_type;
-	enum VIEW_TYPE {
-		VIEW_DEFAULT,
-		VIEW_TEXTURE,
-	};
-
 	bool ssTimer;
 
 	// 작업입니다.
@@ -36,8 +28,6 @@ public:
 	void DrawGLScene(void);
 	void Display();
 	void RotateSphere(float rot);
-	void DrawSphere2();
-	void drawSphere(double r, int lats, int longs);
 
  // 재정의입니다.
 public:

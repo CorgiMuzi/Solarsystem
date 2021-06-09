@@ -17,87 +17,127 @@
 #define new DEBUG_NEW
 #endif
 
-#pragma region Prop_for_drawing_Spheres
-//void DrawTriangle(float* v1, float* v2, float* v3);
-//void Normalize(float v[3]);
-//void SubDivide(float* v1, float* v2, float* v3, long depth);
-
-//static GLfloat vdata[12][3] = {
-//   {-X, 0.0, Z}, {X, 0.0, Z}, {-X, 0.0, -Z}, {X, 0.0, -Z},
-//   {0.0, Z, X}, {0.0, Z, -X}, {0.0, -Z, X}, {0.0, -Z, -X},
-//   {Z, X, 0.0}, {-Z, X, 0.0}, {Z, -X, 0.0}, {-Z, -X, 0.0}
-//};
-//
-//static GLint tindices[20][3] = {
-//   {0,4,1}, {0,9,4}, {9,5,4}, {4,5,8}, {4,8,1},
-//   {8,10,1}, {8,3,10}, {5,3,8}, {5,2,3}, {2,7,3},
-//   {7,10,3}, {7,6,10}, {7,11,6}, {11,0,6}, {0,1,6},
-//   {6,1,10}, {9,0,11}, {9,11,2}, {9,2,5}, {7,2,11} };
-#pragma endregion
-
+void ToOrtho(GLsizei width, GLsizei height);
+void ToPerspective(GLsizei width, GLsizei height);
 bool InitGLSL();
-CBitmap* GetImgBitmap(CImage* pImg);
-GLuint LoadGLTexture(BITMAP* pBm);
-GLuint LoadImgTexture(LPCTSTR fName); 
+bool InitSharedMem();
+void ClearSharedMem();
+void InitLights();
+GLuint LoadTexture(const char* fileName, bool wrap = true);
 
 #pragma region Shader_Source
 const char* vertexShaderSource = R"(
-#version 330
-in vec3 pos;
-in vec2 texAttrib;
-out vec2 passTexAttrib;
-
-void main(){
-gl_position = vec4(pos, 1.0f);
-passTexAttrib = texAttrib;
+#version 110
+uniform mat4 matrixModelView;
+uniform mat4 matrixNormal;
+uniform mat4 matrixModelViewProjection;
+attribute vec3 vertexPosition;
+attribute vec3 vertexNormal;
+attribute vec2 vertexTexCoord;
+varying vec3 esVertex, esNormal;
+varying vec2 texCoord0;
+void main()
+{
+    esVertex = vec3(matrixModelView * vec4(vertexPosition, 1.0));
+    esNormal = vec3(matrixNormal * vec4(vertexNormal, 1.0));
+    texCoord0 = vertexTexCoord;
+    gl_Position = matrixModelViewProjection * vec4(vertexPosition, 1.0);
+}
 )";
 
 const char* fragmentShaderSource = R"(
-#version 330
-in vec2 passTexAttrib;
-out vec4 fragmentColor;
+#version 110
+uniform vec4 lightPosition;             
+uniform vec4 lightAmbient;              
+uniform vec4 lightDiffuse;              
+uniform vec4 lightSpecular;             
+uniform vec4 materialAmbient;           
+uniform vec4 materialDiffuse;           
+uniform vec4 materialSpecular;          
+uniform float materialShininess;        
+uniform sampler2D map0;                 
+uniform bool textureUsed;               
+varying vec3 esVertex, esNormal;
+varying vec2 texCoord0;
+void main()
+{
+    vec3 normal = normalize(esNormal);
+    vec3 light;
+    if(lightPosition.w == 0.0)
+    {
+        light = normalize(lightPosition.xyz);
+    }
+    else
+    {
+        light = normalize(lightPosition.xyz - esVertex);
+    }
+    vec3 view = normalize(-esVertex);
+    vec3 halfv = normalize(light + view);
 
-uniform smapler2D tex;
-void main(){
-fragmentColor = texture(tex, passTexAttrib);
+    vec3 color = lightAmbient.rgb * materialAmbient.rgb;       
+    float dotNL = max(dot(normal, light), 0.0);
+    color += lightDiffuse.rgb * materialDiffuse.rgb * dotNL;    
+    if(textureUsed)
+        color *= texture2D(map0, texCoord0).rgb;               
+    float dotNH = max(dot(normal, halfv), 0.0);
+    color += pow(dotNH, materialShininess) * lightSpecular.rgb * materialSpecular.rgb; 
+    gl_FragColor = vec4(color, materialDiffuse.a);
 }
 )";
+
 #pragma endregion
 
 #pragma region Property_for_Shader
-
 GLuint shaderProgram = 0;
-GLuint VBO = 0, VAO = 0;
-GLuint earthTex;
-GLuint quadPositionVBO;
-GLuint quadTexVBO;
+bool glslSupported;
+GLint uniformMatrixModelView;
+GLint uniformMatrixModelViewProjection;
+GLint uniformMatrixNormal;
+GLint uniformLightPosition;
+GLint uniformLightAmbient;
+GLint uniformLightDiffuse;
+GLint uniformLightSpecular;
+GLint uniformMaterialAmbient;
+GLint uniformMaterialDiffuse;
+GLint uniformMaterialSpecular;
+GLint uniformMaterialShininess;
+GLint uniformMap0;
+GLint uniformTextureUsed;
+GLint attribVertexPosition;
+GLint attribVertexNormal;
+GLint attribVertexTexCoord;
 
-
-// temp
-float position[] = {
-	-0.5f, -0.5f,
-	0.5f, -0.5f,
-	0.5f, 0.5f,
-	-0.5f, 0.5f
-};
-
-float texCoordinate[] = {
-	0.0f, 0.0f,
-	0.0f, 1.0f,
-	1.0f, 1.0f,
-	1.0f, 0.0f
-};
 #pragma endregion
 
-float lineColor[] = { 5.0f, 0.0f, 0.0f, 1 };
-float lineColor2[] = { 0.0f, 5.0f, 0.0f, 1 };
+#pragma region Global_Variables
+int screenWidth;
+int screenHeight;
+bool mouseLeftDown;
+bool mouseRightDown;
+bool mouseMiddleDown;
+float mouseX, mouseY;
+float cameraAngleX;
+float cameraAngleY;
+float cameraDistance;
+int drawMode;
+bool vboSupported;
+GLuint vboId1 = 0, vboId2 = 0;      
+GLuint iboId1 = 0, iboId2 = 0;      
+GLuint EarthTex;
+int imageWidth;
+int imageHeight;
+Matrix4 matrixModelView;
+Matrix4 matrixProjection;
+#pragma endregion
+
+#pragma region Sphere_Properties
+Sphere sun(5.0f, 36, 18);
+Sphere earth(3.0f, 36, 18);
 
 float sunRot = 0;
 float earthRot = 0;
 float merRot = 0;
-
-Sphere sun(5.0f, 36, 18);
-Sphere earth(3.0f, 36, 18);
+#pragma endregion
 
 // CSolarSystemView
 
@@ -120,19 +160,13 @@ END_MESSAGE_MAP()
 
 CSolarSystemView::CSolarSystemView() noexcept
 	:ssTimer(true)
-	, m_view_type(VIEW_DEFAULT)
-	, m_texNum(0)
 {
 	// TODO: 여기에 생성 코드를 추가합니다.
 }
 
 CSolarSystemView::~CSolarSystemView()
 {
-	while (m_globTexture.GetSize()) {
-		GLuint nt = (UINT)m_globTexture[0];
-		glDeleteTextures(1, &nt);
-		m_globTexture.RemoveAt(0);
-	}
+
 }
 
 BOOL CSolarSystemView::PreCreateWindow(CREATESTRUCT& cs)
@@ -274,104 +308,34 @@ int CSolarSystemView::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	InitGL();
 	InitGLSL();
 
-	m_globTexture.Add((WORD)LoadImgTexture(_T("bmp/earth.bmp")));
-	m_globTexture.Add((WORD)LoadImgTexture(_T("bmp/moon.bmp")));
-
 	return 0;
 }
 
 void CSolarSystemView::InitGL(void)
 {
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f); // Color Buffer 초기값 초기화
-	glClear(GL_COLOR_BUFFER_BIT);
-	glClearDepth(1.f); // Depth Buffer 초기값 초기화
+	//glClear(GL_COLOR_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST); // Fragment Shader 수행 전 Depth Buffer 에 값을 저장할 Fragment 를 미리 선별하는 Depth Testing 실행
-	glDepthFunc(GL_LEQUAL); // fragment 의 Depth 값이 Current Depth Buffer와 크기가 같거나 작을 경우 Depth Buffer 에 누적
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST); // Color 와 Texture 의 보간 작업에 대해 GL_NICEST, 품질 우선으로 작업하도록 권고
+	glEnable(GL_LIGHTING);
 	glEnable(GL_TEXTURE_2D);
-}
+	glEnable(GL_CULL_FACE);
 
-void CSolarSystemView::OnDestroy()
-{
-	CView::OnDestroy();
-	wglMakeCurrent(m_hDC, NULL);
-	wglDeleteContext(m_hglRC);
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	if (ssTimer) {
-		KillTimer(1);
-		ssTimer = false;
-	}
-}
+	glClearStencil(0);
+	glClearDepth(1.f); // Depth Buffer 초기값 초기화
+	glDepthFunc(GL_LEQUAL); // fragment 의 Depth 값이 Current Depth Buffer와 크기가 같거나 작을 경우 Depth Buffer 에 누적
 
+	InitLights();
 
-void CSolarSystemView::OnSize(UINT nType, int cx, int cy)
-{
-	CView::OnSize(nType, cx, cy);
-
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	ReSizeGLScene(cx, cy);
-}
-
-void CSolarSystemView::ReSizeGLScene(GLsizei width, GLsizei height) {
-	glViewport(0, 0, width, height);
-
-	glMatrixMode(GL_PROJECTION); // 행렬 연산의 대상이 되는 스택을 Projection Stack 으로 변경
-	glLoadIdentity();
-
-	double screenRatio = (double)width / (double)height;
-
-	glFrustum(-screenRatio, screenRatio, -1.0f, 1.0f, 1.0f, 10000.0f); // 원근감을 주기 위해 카메라 시야각 설정
-
-
-}
-
-void CSolarSystemView::DrawGLScene(void)
-{
-	wglMakeCurrent(m_hDC, m_hglRC);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Color Buffer와 Depth Buffer에 존재하는 값을 초기화
-
-	// 태양계 그리기
-
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	// World Coordinate Sys 조정
-	// 카메라 세팅
-	GLfloat rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
-	GLfloat posX = 0.0f, posY = 0.0f, posZ = 25.0f;
-
-	// 1번 스케일링
-	glScalef(1.0f, 1.0f, 1.0f);
-
-	// 2번 회전
-	glRotatef(rotX, 1, 0, 0);
-	glRotatef(rotY, 0, 1, 0);
-	glRotatef(rotZ, 0, 0, 1);
-
-	// 3번 이동
-	glTranslatef(-posX, -posY, -posZ);
-
-
-	Display();
-
-	// 화면 갱신
-	SwapBuffers(m_hDC);
-
-}
-
-void GetColor(float color[]) {
-	static int j = 0;
-	j++;
-	srand(j);
-	for (int i = 0; i < 3; i++) {
-		color[i] = (rand() % 256) / 255.0;
-	}
+	GLenum err = glewInit();
 }
 
 #pragma region Shader_Part
-bool InitGLSL() {
-	GLenum err = glewInit();
+const int   SCREEN_WIDTH = 1500;
+const int   SCREEN_HEIGHT = 500;
+const float CAMERA_DISTANCE = 4.0f;
 
+bool InitGLSL() {
 	const int MAX_LENGTH = 2048;
 	char log[MAX_LENGTH];
 	int logLength = 0;
@@ -401,14 +365,48 @@ bool InitGLSL() {
 		std::cout << "++++++ Fragment Shader Log +++++\n" << log << std::endl;
 	}
 
-	// Linking Two Shaders into the Shader Program
 	glAttachShader(shaderProgram, vertexShader);
 	glAttachShader(shaderProgram, fragmentShader);
 
 	glLinkProgram(shaderProgram);
 
-	// Setting Shader Program
 	glUseProgram(shaderProgram);
+
+	uniformMatrixModelView = glGetUniformLocation(shaderProgram, "matrixModelView");
+	uniformMatrixModelViewProjection = glGetUniformLocation(shaderProgram, "matrixModelViewProjection");
+	uniformMatrixNormal = glGetUniformLocation(shaderProgram, "matrixNormal");
+	uniformLightPosition = glGetUniformLocation(shaderProgram, "lightPosition");
+	uniformLightAmbient = glGetUniformLocation(shaderProgram, "lightAmbient");
+	uniformLightDiffuse = glGetUniformLocation(shaderProgram, "lightDiffuse");
+	uniformLightSpecular = glGetUniformLocation(shaderProgram, "lightSpecular");
+	uniformMaterialAmbient = glGetUniformLocation(shaderProgram, "materialAmbient");
+	uniformMaterialDiffuse = glGetUniformLocation(shaderProgram, "materialDiffuse");
+	uniformMaterialSpecular = glGetUniformLocation(shaderProgram, "materialSpecular");
+	uniformMaterialShininess = glGetUniformLocation(shaderProgram, "materialShininess");
+	uniformMap0 = glGetUniformLocation(shaderProgram, "map0");
+	uniformTextureUsed = glGetUniformLocation(shaderProgram, "textureUsed");
+	attribVertexPosition = glGetAttribLocation(shaderProgram, "vertexPosition");
+	attribVertexNormal = glGetAttribLocation(shaderProgram, "vertexNormal");
+	attribVertexTexCoord = glGetAttribLocation(shaderProgram, "vertexTexCoord");
+
+	float lightPosition[] = { 0, 0, 1, 0 };
+	float lightAmbient[] = { 0.3f, 0.3f, 0.3f, 1 };
+	float lightDiffuse[] = { 0.7f, 0.7f, 0.7f, 1 };
+	float lightSpecular[] = { 1.0f, 1.0f, 1.0f, 1 };
+	float materialAmbient[] = { 0.5f, 0.5f, 0.5f, 1 };
+	float materialDiffuse[] = { 0.7f, 0.7f, 0.7f, 1 };
+	float materialSpecular[] = { 0.4f, 0.4f, 0.4f, 1 };
+	float materialShininess = 16;
+	glUniform4fv(uniformLightPosition, 1, lightPosition);
+	glUniform4fv(uniformLightAmbient, 1, lightAmbient);
+	glUniform4fv(uniformLightDiffuse, 1, lightDiffuse);
+	glUniform4fv(uniformLightSpecular, 1, lightSpecular);
+	glUniform4fv(uniformMaterialAmbient, 1, materialAmbient);
+	glUniform4fv(uniformMaterialDiffuse, 1, materialDiffuse);
+	glUniform4fv(uniformMaterialSpecular, 1, materialSpecular);
+	glUniform1f(uniformMaterialShininess, materialShininess);
+	glUniform1i(uniformMap0, 0);
+	glUniform1i(uniformTextureUsed, 1);
 
 	glUseProgram(0);
 
@@ -425,208 +423,283 @@ bool InitGLSL() {
 	}
 }
 
-CBitmap* GetImgBitmap(CImage* pImg) {
-	if (pImg == NULL)
-		return NULL;
+void InitLights() {
+	GLfloat lightKa[] = { .3f, .3f, .3f, 1.0f };  
+	GLfloat lightKd[] = { .7f, .7f, .7f, 1.0f };  
+	GLfloat lightKs[] = { 1, 1, 1, 1 };           
+	glLightfv(GL_LIGHT0, GL_AMBIENT, lightKa);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightKd);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, lightKs);
 
-	CDC* pDC = new CDC;
-	if (!pDC->CreateCompatibleDC(CDC::FromHandle(pImg->GetDC())))
-		return NULL;
-	CBitmap* pBm = new CBitmap;
-	pBm->CreateCompatibleBitmap(CDC::FromHandle(pImg->GetDC()), pImg->GetWidth(), pImg->GetHeight());
+	float lightPos[4] = { 0, 0, 1, 0 };
+	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 
-	CBitmap* pBmOld = pDC->SelectObject(pBm);
-	pImg->BitBlt(pDC->m_hDC, CPoint(0, 0));
-	pDC->DeleteDC();
-
-	pImg->ReleaseDC();
-
-	return pBm;
+	glEnable(GL_LIGHT0);
 }
 
-GLuint LoadGLTexture(BITMAP* pBm) {
-	GLuint texi;
-	glGenTextures(1, &texi);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-	glBindTexture(GL_TEXTURE_2D, texi);
+bool InitSharedMem()
+{
+	screenWidth = SCREEN_WIDTH;
+	screenHeight = SCREEN_HEIGHT;
 
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	return texi;
+	mouseLeftDown = mouseRightDown = mouseMiddleDown = false;
+	mouseX = mouseY = 0;
+
+	cameraAngleX = cameraAngleY = 0.0f;
+	cameraDistance = CAMERA_DISTANCE;
+
+	drawMode = 0; // 0:fill, 1: wireframe, 2:points
+
+	return true;
+
 }
 
-GLuint LoadImgTexture(LPCTSTR fName) {
-	CImage img;
-	HRESULT hResult = img.Load(fName);
-	if (FAILED(hResult)) {
-		_TCHAR fmt[1028];
-		_stprintf_s((_TCHAR*)fmt, hResult, _T("Error %d\n%s\nin file:\n%s"), _com_error(hResult).ErrorMessage(), fName);
-		MessageBox(NULL, fmt, _T("Error:"), MB_OK | MB_ICONERROR);
-		return FALSE;
-	}
-
-	CBitmap* pBm = NULL;
-	if (img.GetBPP() != 24) {
-		img.ReleaseDC();
-		CImage tmg;
-		tmg.Create(img.GetWidth(), img.GetHeight(), 24);
-		img.BitBlt(tmg.GetDC(), CPoint(0, 0));
-		pBm = GetImgBitmap(&tmg);
-		tmg.ReleaseDC();
-	}
-	else {
-		pBm = GetImgBitmap(&img);
-		img.ReleaseDC();
-	}
-
-	BITMAP BMP;
-	pBm->GetBitmap(&BMP);
-
-	return LoadGLTexture(&BMP);
+void ClearSharedMem()
+{
+		glDeleteBuffers(1, &vboId1);
+		glDeleteBuffers(1, &iboId1);
+		glDeleteBuffers(1, &vboId2);
+		glDeleteBuffers(1, &iboId2);
+		vboId1 = iboId1 = 0;
+		vboId2 = iboId2 = 0;
 }
-#pragma endregion
 
-#pragma region 1st_Method_for_Drawing_Sphere
-/// <summary>
-/// 1st Method for Drawing Sphere
-/// </summary>
-/// <param name="r">radius</param>
-/// <param name="lats">latitudes</param>
-/// <param name="longs">longitudes</param>
-//void CSolarSystemView::drawSphere(double r, int lats, int longs) {
-//
-//    int i, j;
-//    for (i = 0; i <= lats; i++) {
-//        double lat0 = PI * (-0.5 + (double)(i - 1) / lats);
-//        double z0 = sin(lat0);
-//        double zr0 = cos(lat0);
-//
-//        double lat1 = PI * (-0.5 + (double)i / lats);
-//        double z1 = sin(lat1);
-//        double zr1 = cos(lat1);
-//
-//        
-//
-//        glBegin(GL_POLYGON);
-//        for (j = 0; j <= longs; j++) {
-//            double lng = 2 * PI * (double)(j - 1) / longs;
-//            double x = cos(lng);
-//            double y = sin(lng);
-//
-//            float color[3];
-//            //GetColor(color);
-//            glColor3f(1.0f, 0.0f, 0.0f);
-//            glNormal3f(x * zr0, y * zr0, z0);
-//            glVertex3f(x * zr0, y * zr0, z0);
-//            glNormal3f(x * zr1, y * zr1, z1);
-//            glVertex3f(x * zr1, y * zr1, z1);
-//        }
-//
-//        glEnd();
-//    }
-//
-//}
-#pragma endregion
+void SetCamera()
+{
+	// 태양계 그리기
 
-#pragma region 2nd_Method_for_Drawing_Sphere
-//void DrawTriangle(float* v1, float* v2, float* v3) {
-//	// 알아보기 편하게 하기 위해 색 지정
-//	/*float color[3];
-//	GetColor(color);
-//	glColor3fv(color);*/
-//	glColor3f(1.0f, 0.0f, 1.0f);
-//	glBegin(GL_LINE_STRIP);
-//	glNormal3fv(v1); glVertex3fv(v1);
-//	glNormal3fv(v2); glVertex3fv(v2);
-//	glNormal3fv(v3); glVertex3fv(v3);
-//	glEnd();
-//}
-//
-//void Normalize(float v[3]) {
-//	GLfloat d = sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
-//	if (d == 0.0) {
-//		return;
-//	}
-//	v[0] /= d;
-//	v[1] /= d;
-//	v[2] /= d;
-//}
-//
-//
-//void SubDivide(float* v1, float* v2, float* v3, long depth) {
-//	GLfloat v12[3], v23[3], v31[3];
-//	if (depth == 0) {
-//		DrawTriangle(v1, v2, v3);
-//		return;
-//	}
-//
-//	for (int i = 0; i < 3; i++) {
-//		v12[i] = (v1[i] + v2[i]) / 2.0;
-//		v23[i] = (v2[i] + v3[i]) / 2.0;
-//		v31[i] = (v3[i] + v1[i]) / 2.0;
-//	}
-//
-//	Normalize(v12);
-//	Normalize(v23);
-//	Normalize(v31);
-//
-//	SubDivide(v1, v12, v31, depth - 1);
-//	SubDivide(v2, v23, v12, depth - 1);
-//	SubDivide(v3, v31, v23, depth - 1);
-//	SubDivide(v12, v23, v31, depth - 1);
-//}
-//
-//void CSolarSystemView::DrawSphere2() {
-//	for (int i = 0; i < 20; i++) {
-//		SubDivide(&vdata[tindices[i][0]][0],
-//			&vdata[tindices[i][1]][0],
-//			&vdata[tindices[i][2]][0], 3);
-//	}
-//}
-#pragma endregion
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	// World Coordinate Sys 조정
+	// 카메라 세팅
+	GLfloat rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
+	GLfloat posX = 0.0f, posY = 0.0f, posZ = 25.0f;
+
+	// 1번 스케일링
+	glScalef(1.0f, 1.0f, 1.0f);
+
+	// 2번 회전
+	glRotatef(rotX, 1, 0, 0);
+	glRotatef(rotY, 0, 1, 0);
+	glRotatef(rotZ, 0, 0, 1);
+
+	// 3번 이동
+	glTranslatef(-posX, -posY, -posZ);
+}
+
+GLuint LoadTexture(const char* fileName, bool wrap)
+{
+	Image::Bmp bmp;
+	if (!bmp.read(fileName))
+		return 0;     
+
+	int width = bmp.getWidth();
+	int height = bmp.getHeight();
+	const unsigned char* data = bmp.getDataRGB();
+	GLenum type = GL_UNSIGNED_BYTE;  
+
+	GLenum format;
+	int bpp = bmp.getBitCount();
+	if (bpp == 8)
+		format = GL_LUMINANCE;
+	else if (bpp == 24)
+		format = GL_RGB;
+	else if (bpp == 32)
+		format = GL_RGBA;
+	else
+		return 0;               
+
+	GLuint texture;
+	glGenTextures(1, &texture);
+
+	glBindTexture(GL_TEXTURE_2D, texture);
+
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap ? GL_REPEAT : GL_CLAMP);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap ? GL_REPEAT : GL_CLAMP);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, type, data);
+
+	return texture;
+}
+
+
+void CSolarSystemView::OnDestroy()
+{
+	CView::OnDestroy();
+	wglMakeCurrent(m_hDC, NULL);
+	wglDeleteContext(m_hglRC);
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	if (ssTimer) {
+		KillTimer(1);
+		ssTimer = false;
+	}
+}
+
+
+void CSolarSystemView::OnSize(UINT nType, int cx, int cy)
+{
+	CView::OnSize(nType, cx, cy);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//ReSizeGLScene(cx, cy);
+	ToPerspective(cx, cy);
+}
+
+void CSolarSystemView::ReSizeGLScene(GLsizei width, GLsizei height) {
+	glViewport(0, 0, width, height);
+
+	glMatrixMode(GL_PROJECTION); // 행렬 연산의 대상이 되는 스택을 Projection Stack 으로 변경
+	glLoadIdentity();
+
+	double screenRatio = (double)width / (double)height;
+
+	glFrustum(-screenRatio, screenRatio, -1.0f, 1.0f, 1.0f, 10000.0f); // 원근감을 주기 위해 카메라 시야각 설정
+}
+
+void ToOrtho(GLsizei width, GLsizei height)
+{
+	const float N = -1.0f;
+	const float F = 1.0f;
+
+	// set viewport to be the entire window
+	glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+
+	// construct ortho projection matrix
+	matrixProjection.identity();
+	matrixProjection[0] = 2 / width;
+	matrixProjection[5] = 2 / height;
+	matrixProjection[10] = -2 / (F - N);
+	matrixProjection[14] = -(F + N) / (F - N);
+
+	// set orthographic viewing frustum
+	glMatrixMode(GL_PROJECTION);
+	glLoadMatrixf(matrixProjection.get());
+	//glLoadIdentity();
+	//glOrtho(0, screenWidth, 0, screenHeight, -1, 1);
+
+	// switch to modelview matrix in order to set scene
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+}
+
+void ToPerspective(GLsizei width, GLsizei height)
+{
+	const float N = 0.1f;
+	const float F = 100.0f;
+	const float DEG2RAD = 3.141592f / 180;
+	const float FOV_Y = 40.0f * DEG2RAD;
+
+	// set viewport to be the entire window
+	glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+
+	// construct perspective projection matrix
+	float aspectRatio = (float)(width) / height;
+	float tangent = tanf(FOV_Y / 2.0f);     // tangent of half fovY
+	float h = N * tangent;                  // half height of near plane
+	float w = h * aspectRatio;              // half width of near plane
+	matrixProjection.identity();
+	matrixProjection[0] = N / w;
+	matrixProjection[5] = N / h;
+	matrixProjection[10] = -(F + N) / (F - N);
+	matrixProjection[11] = -1;
+	matrixProjection[14] = -(2 * F * N) / (F - N);
+	matrixProjection[15] = 0;
+
+	// set perspective viewing frustum
+	glMatrixMode(GL_PROJECTION);
+	glLoadMatrixf(matrixProjection.get());
+
+	// switch to modelview matrix in order to set scene
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+}
+
+
+void CSolarSystemView::DrawGLScene(void)
+{
+	wglMakeCurrent(m_hDC, m_hglRC);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT| GL_STENCIL_BUFFER_BIT); // Color Buffer와 Depth Buffer에 존재하는 값을 초기화
+
+	SetCamera();
+
+	Display();
+
+	// 화면 갱신
+	SwapBuffers(m_hDC);
+}
+
+float lineColor[] = { 0.2f, 0.2f, 0.2f, 1 };
 
 void CSolarSystemView::Display() {
+	glGenBuffers(1, &vboId2);
+	glBindBuffer(GL_ARRAY_BUFFER, vboId2);
+	glBufferData(GL_ARRAY_BUFFER, sun.getInterleavedVertexSize(), sun.getInterleavedVertices(), GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glGenBuffers(1, &iboId2);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId2);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sun.getIndexSize(), sun.getIndices(), GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	EarthTex = LoadTexture("bmp/earth.bmp", true);
+
 	glPushMatrix();
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, (GLuint)m_globTexture.GetAt(m_texNum));
-	glRotatef(sunRot, 0.0f, 1.0f, 0.0f);
-	glRotatef(sunRot, 0.5f, 0.0f, 0.0f);
+	// transform camera (view)
+	Matrix4 matrixView;
+	matrixView.translate(0, 0, -50);
 
-	glBegin(GL_QUADS);
-	glColor3f(1.0f, 1.0f, 1.0f);
-	// Front Face
-	glTexCoord2f(0.0f, 0.0f); glVertex3f(-1.0f, -1.0f, 1.0f);
-	glTexCoord2f(1.0f, 0.0f); glVertex3f(1.0f, -1.0f, 1.0f);
-	glTexCoord2f(1.0f, 1.0f); glVertex3f(1.0f, 1.0f, 1.0f);
-	glTexCoord2f(0.0f, 1.0f); glVertex3f(-1.0f, 1.0f, 1.0f);
-	// Back Face
-	glTexCoord2f(1.0f, 0.0f); glVertex3f(-1.0f, -1.0f, -1.0f);
-	glTexCoord2f(1.0f, 1.0f); glVertex3f(-1.0f, 1.0f, -1.0f);
-	glTexCoord2f(0.0f, 1.0f); glVertex3f(1.0f, 1.0f, -1.0f);
-	glTexCoord2f(0.0f, 0.0f); glVertex3f(1.0f, -1.0f, -1.0f);
-	// Top Face
-	glTexCoord2f(0.0f, 1.0f); glVertex3f(-1.0f, 1.0f, -1.0f);
-	glTexCoord2f(0.0f, 0.0f); glVertex3f(-1.0f, 1.0f, 1.0f);
-	glTexCoord2f(1.0f, 0.0f); glVertex3f(1.0f, 1.0f, 1.0f);
-	glTexCoord2f(1.0f, 1.0f); glVertex3f(1.0f, 1.0f, -1.0f);
-	// Bottom Face
-	glTexCoord2f(1.0f, 1.0f); glVertex3f(-1.0f, -1.0f, -1.0f);
-	glTexCoord2f(0.0f, 1.0f); glVertex3f(1.0f, -1.0f, -1.0f);
-	glTexCoord2f(0.0f, 0.0f); glVertex3f(1.0f, -1.0f, 1.0f);
-	glTexCoord2f(1.0f, 0.0f); glVertex3f(-1.0f, -1.0f, 1.0f);
-	// Right face
-	glTexCoord2f(1.0f, 0.0f); glVertex3f(1.0f, -1.0f, -1.0f);
-	glTexCoord2f(1.0f, 1.0f); glVertex3f(1.0f, 1.0f, -1.0f);
-	glTexCoord2f(0.0f, 1.0f); glVertex3f(1.0f, 1.0f, 1.0f);
-	glTexCoord2f(0.0f, 0.0f); glVertex3f(1.0f, -1.0f, 1.0f);
-	// Left Face
-	glTexCoord2f(0.0f, 0.0f); glVertex3f(-1.0f, -1.0f, -1.0f);
-	glTexCoord2f(1.0f, 0.0f); glVertex3f(-1.0f, -1.0f, 1.0f);
-	glTexCoord2f(1.0f, 1.0f); glVertex3f(-1.0f, 1.0f, 1.0f);
-	glTexCoord2f(0.0f, 1.0f); glVertex3f(-1.0f, 1.0f, -1.0f);
-	glEnd();
+	// common model matrix
+	Matrix4 matrixModelCommon;
+	matrixModelCommon.rotateX(-90);
+	matrixModelCommon.rotateY(earthRot);
 
-	glDisable(GL_TEXTURE_2D);
+	glPushMatrix();
+	// model matrix for each instance
+	Matrix4 EarthModel(matrixModelCommon);    // right
+
+	glUseProgram(shaderProgram);
+	glBindTexture(GL_TEXTURE_2D, EarthTex);
+
+	glEnableVertexAttribArray(attribVertexPosition);
+	glEnableVertexAttribArray(attribVertexNormal);
+	glEnableVertexAttribArray(attribVertexTexCoord);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vboId2);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId2);
+
+	int stride = sun.getInterleavedStride();
+	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+
+	matrixModelView = matrixView * EarthModel;
+	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+	Matrix4 matrixNormal = matrixModelView;
+	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+
+	glDrawElements(GL_TRIANGLES,           
+		sun.getIndexCount(), 
+		GL_UNSIGNED_INT,     
+		(void*)0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glDisableVertexAttribArray(attribVertexPosition);
+	glDisableVertexAttribArray(attribVertexNormal);
+	glDisableVertexAttribArray(attribVertexTexCoord);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glUseProgram(0);
 	
 	glPopMatrix();
 }

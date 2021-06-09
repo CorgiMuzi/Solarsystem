@@ -76,16 +76,16 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>D:\3_1\컴퓨터그래픽스\opengl\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\3_1\컴퓨터그래픽스\opengl\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\김지헌\Documents\Github\SolarSystem\Solarsystem\opengl\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\김지헌\Documents\Github\SolarSystem\Solarsystem\opengl\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>D:\3_1\컴퓨터그래픽스\opengl\Include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\3_1\컴퓨터그래픽스\opengl\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\김지헌\Documents\Github\SolarSystem\Solarsystem\opengl\Include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\김지헌\Documents\Github\SolarSystem\Solarsystem\opengl\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
@@ -189,11 +189,13 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Bmp.h" />
     <ClInclude Include="ChildFrm.h" />
     <ClInclude Include="ClassView.h" />
     <ClInclude Include="FileView.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="MainFrm.h" />
+    <ClInclude Include="Matrices.h" />
     <ClInclude Include="OutputWnd.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="PropertiesWnd.h" />
@@ -203,13 +205,16 @@
     <ClInclude Include="SolarSystemView.h" />
     <ClInclude Include="Sphere.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="Vectors.h" />
     <ClInclude Include="ViewTree.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Bmp.cpp" />
     <ClCompile Include="ChildFrm.cpp" />
     <ClCompile Include="ClassView.cpp" />
     <ClCompile Include="FileView.cpp" />
     <ClCompile Include="MainFrm.cpp" />
+    <ClCompile Include="Matrices.cpp" />
     <ClCompile Include="OutputWnd.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

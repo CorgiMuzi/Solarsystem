@@ -15,13 +15,14 @@
 
 #include "glew.h"
 #include <gl/GL.h>
+#include <fstream>
 #include <iostream>
 #include <cmath>
 #include <vector>
-#include "glm/glm.hpp"
 #include "glext.h"
 #include "Sphere.h"
+#include "Bmp.h"
+#include "Matrices.h"
+#include "Vectors.h"
 
 #define PI 3.141592f
-#define X .525731112119133606 
-#define Z .8506508083520399321
