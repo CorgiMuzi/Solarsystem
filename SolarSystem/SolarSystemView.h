@@ -23,11 +23,23 @@ public:
 
 	// 작업입니다.
 public:
-	void InitGL(void);
+	void InitGL();
+	bool InitGLSL();
+	void InitLights();
+
+	bool InitSharedMem();
+	void ClearSharedMem();
+
+	void SetCamera();
 	void ReSizeGLScene(GLsizei width, GLsizei height);
 	void DrawGLScene(void);
+	void ToOrtho(GLsizei width, GLsizei height);
+	void ToPerspective(GLsizei width, GLsizei height);
+
 	void Display();
+
 	void RotateSphere(float rot);
+	GLuint LoadTexture(const char* fileName, bool wrap = true);
 
  // 재정의입니다.
 public:

@@ -17,14 +17,6 @@
 #define new DEBUG_NEW
 #endif
 
-void ToOrtho(GLsizei width, GLsizei height);
-void ToPerspective(GLsizei width, GLsizei height);
-bool InitGLSL();
-bool InitSharedMem();
-void ClearSharedMem();
-void InitLights();
-GLuint LoadTexture(const char* fileName, bool wrap = true);
-
 #pragma region Shader_Source
 const char* vertexShaderSource = R"(
 #version 110
@@ -110,6 +102,9 @@ GLint attribVertexTexCoord;
 #pragma endregion
 
 #pragma region Global_Variables
+const int   SCREEN_WIDTH = 1500;
+const int   SCREEN_HEIGHT = 500;
+const float CAMERA_DISTANCE = 4.0f;
 int screenWidth;
 int screenHeight;
 bool mouseLeftDown;
@@ -121,8 +116,8 @@ float cameraAngleY;
 float cameraDistance;
 int drawMode;
 bool vboSupported;
-GLuint vboId1 = 0, vboId2 = 0;      
-GLuint iboId1 = 0, iboId2 = 0;      
+GLuint vboId1 = 0, vboId2 = 0;
+GLuint iboId1 = 0, iboId2 = 0;
 GLuint EarthTex;
 int imageWidth;
 int imageHeight;
@@ -131,6 +126,7 @@ Matrix4 matrixProjection;
 #pragma endregion
 
 #pragma region Sphere_Properties
+float lineColor[] = { 0.2f, 0.2f, 0.2f, 1 };
 Sphere sun(5.0f, 36, 18);
 Sphere earth(3.0f, 36, 18);
 
@@ -140,6 +136,74 @@ float merRot = 0;
 #pragma endregion
 
 // CSolarSystemView
+
+void CSolarSystemView::Display() {
+	glGenBuffers(1, &vboId2);
+	glBindBuffer(GL_ARRAY_BUFFER, vboId2);
+	glBufferData(GL_ARRAY_BUFFER, sun.getInterleavedVertexSize(), sun.getInterleavedVertices(), GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glGenBuffers(1, &iboId2);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId2);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sun.getIndexSize(), sun.getIndices(), GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	EarthTex = LoadTexture("bmp/earth.bmp", true);
+
+	glPushMatrix();
+	// transform camera (view)
+	Matrix4 matrixView;
+	matrixView.translate(0, 0, -50);
+
+	// common model matrix
+	Matrix4 matrixModelCommon;
+	matrixModelCommon.rotateX(-90);
+	matrixModelCommon.rotateY(earthRot);
+
+	glPushMatrix();
+	// model matrix for each instance
+	Matrix4 EarthModel(matrixModelCommon);    // right
+
+	glUseProgram(shaderProgram);
+	glBindTexture(GL_TEXTURE_2D, EarthTex);
+
+	glEnableVertexAttribArray(attribVertexPosition);
+	glEnableVertexAttribArray(attribVertexNormal);
+	glEnableVertexAttribArray(attribVertexTexCoord);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vboId2);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId2);
+
+	int stride = sun.getInterleavedStride();
+	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+
+	matrixModelView = matrixView * EarthModel;
+	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+	Matrix4 matrixNormal = matrixModelView;
+	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+
+	glDrawElements(GL_TRIANGLES,
+		sun.getIndexCount(),
+		GL_UNSIGNED_INT,
+		(void*)0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glDisableVertexAttribArray(attribVertexPosition);
+	glDisableVertexAttribArray(attribVertexNormal);
+	glDisableVertexAttribArray(attribVertexTexCoord);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	glUseProgram(0);
+
+	glPopMatrix();
+}
 
 IMPLEMENT_DYNCREATE(CSolarSystemView, CView)
 
@@ -177,8 +241,42 @@ BOOL CSolarSystemView::PreCreateWindow(CREATESTRUCT& cs)
 	return CView::PreCreateWindow(cs);
 }
 
+int CSolarSystemView::OnCreate(LPCREATESTRUCT lpCreateStruct)
+{
+	if (CView::OnCreate(lpCreateStruct) == -1)
+		return -1;
+	// TODO:  여기에 특수화된 작성 코드를 추가합니다.
+	m_hDC = GetDC()->m_hDC;
+	if (!SetPixelformat(m_hDC))
+		return -1;
+
+	m_hglRC = wglCreateContext(m_hDC); // DC 를 바탕으로 OpenGL을 사용할 Rendering Context 생성
+	wglMakeCurrent(m_hDC, m_hglRC); // 생성된 Rendering Context를 Current Context로 설정
+
+	if (ssTimer) { // 타이머 시작
+		SetTimer(1, 100, NULL);
+	}
+
+	InitGL();
+	InitGLSL();
+
+	return 0;
+}
+
+void CSolarSystemView::OnDestroy()
+{
+	CView::OnDestroy();
+	wglMakeCurrent(m_hDC, NULL);
+	wglDeleteContext(m_hglRC);
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	if (ssTimer) {
+		KillTimer(1);
+		ssTimer = false;
+	}
+}
 
 // CSolarSystemView 그리기
+
 void CSolarSystemView::OnDraw(CDC* /*pDC*/)
 {
 	CSolarSystemDoc* pDoc = GetDocument();
@@ -191,6 +289,18 @@ void CSolarSystemView::OnDraw(CDC* /*pDC*/)
 	DrawGLScene();
 }
 
+void CSolarSystemView::DrawGLScene(void)
+{
+	wglMakeCurrent(m_hDC, m_hglRC);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // Color Buffer와 Depth Buffer에 존재하는 값을 초기화
+
+	SetCamera();
+
+	Display();
+
+	// 화면 갱신
+	SwapBuffers(m_hDC);
+}
 
 // CSolarSystemView 인쇄
 
@@ -289,32 +399,31 @@ BOOL CSolarSystemView::SetPixelformat(HDC hdc) {
 	return TRUE;
 }
 
-int CSolarSystemView::OnCreate(LPCREATESTRUCT lpCreateStruct)
+void CSolarSystemView::OnTimer(UINT_PTR nIDEvent)
 {
-	if (CView::OnCreate(lpCreateStruct) == -1)
-		return -1;
-	// TODO:  여기에 특수화된 작성 코드를 추가합니다.
-	m_hDC = GetDC()->m_hDC;
-	if (!SetPixelformat(m_hDC))
-		return -1;
-
-	m_hglRC = wglCreateContext(m_hDC); // DC 를 바탕으로 OpenGL을 사용할 Rendering Context 생성
-	wglMakeCurrent(m_hDC, m_hglRC); // 생성된 Rendering Context를 Current Context로 설정
-
-	if (ssTimer) { // 타이머 시작
-		SetTimer(1, 100, NULL);
+	if (true) {
+		sunRot += 1;
+		earthRot += 5;
+		earthRot += 8;
 	}
-
-	InitGL();
-	InitGLSL();
-
-	return 0;
+	Invalidate(FALSE);
+	CView::OnTimer(nIDEvent);
 }
 
-void CSolarSystemView::InitGL(void)
+void CSolarSystemView::OnSize(UINT nType, int cx, int cy)
 {
-	glClearColor(0.2f, 0.3f, 0.3f, 1.0f); // Color Buffer 초기값 초기화
-	//glClear(GL_COLOR_BUFFER_BIT);
+	CView::OnSize(nType, cx, cy);
+
+	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
+	//ReSizeGLScene(cx, cy);
+	ToPerspective(cx, cy);
+}
+
+#pragma region //Init_Funcs
+void CSolarSystemView::InitGL()
+{
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Color Buffer 초기값 초기화
+	glClear(GL_COLOR_BUFFER_BIT);
 	glEnable(GL_DEPTH_TEST); // Fragment Shader 수행 전 Depth Buffer 에 값을 저장할 Fragment 를 미리 선별하는 Depth Testing 실행
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST); // Color 와 Texture 의 보간 작업에 대해 GL_NICEST, 품질 우선으로 작업하도록 권고
 	glEnable(GL_LIGHTING);
@@ -330,12 +439,7 @@ void CSolarSystemView::InitGL(void)
 	GLenum err = glewInit();
 }
 
-#pragma region Shader_Part
-const int   SCREEN_WIDTH = 1500;
-const int   SCREEN_HEIGHT = 500;
-const float CAMERA_DISTANCE = 4.0f;
-
-bool InitGLSL() {
+bool CSolarSystemView::InitGLSL() {
 	const int MAX_LENGTH = 2048;
 	char log[MAX_LENGTH];
 	int logLength = 0;
@@ -423,10 +527,10 @@ bool InitGLSL() {
 	}
 }
 
-void InitLights() {
-	GLfloat lightKa[] = { .3f, .3f, .3f, 1.0f };  
-	GLfloat lightKd[] = { .7f, .7f, .7f, 1.0f };  
-	GLfloat lightKs[] = { 1, 1, 1, 1 };           
+void CSolarSystemView::InitLights() {
+	GLfloat lightKa[] = { .3f, .3f, .3f, 1.0f };
+	GLfloat lightKd[] = { .7f, .7f, .7f, 1.0f };
+	GLfloat lightKs[] = { 1, 1, 1, 1 };
 	glLightfv(GL_LIGHT0, GL_AMBIENT, lightKa);
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightKd);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, lightKs);
@@ -437,7 +541,7 @@ void InitLights() {
 	glEnable(GL_LIGHT0);
 }
 
-bool InitSharedMem()
+bool CSolarSystemView::InitSharedMem()
 {
 	screenWidth = SCREEN_WIDTH;
 	screenHeight = SCREEN_HEIGHT;
@@ -453,116 +557,9 @@ bool InitSharedMem()
 	return true;
 
 }
+#pragma endregion
 
-void ClearSharedMem()
-{
-		glDeleteBuffers(1, &vboId1);
-		glDeleteBuffers(1, &iboId1);
-		glDeleteBuffers(1, &vboId2);
-		glDeleteBuffers(1, &iboId2);
-		vboId1 = iboId1 = 0;
-		vboId2 = iboId2 = 0;
-}
-
-void SetCamera()
-{
-	// 태양계 그리기
-
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	// World Coordinate Sys 조정
-	// 카메라 세팅
-	GLfloat rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
-	GLfloat posX = 0.0f, posY = 0.0f, posZ = 25.0f;
-
-	// 1번 스케일링
-	glScalef(1.0f, 1.0f, 1.0f);
-
-	// 2번 회전
-	glRotatef(rotX, 1, 0, 0);
-	glRotatef(rotY, 0, 1, 0);
-	glRotatef(rotZ, 0, 0, 1);
-
-	// 3번 이동
-	glTranslatef(-posX, -posY, -posZ);
-}
-
-GLuint LoadTexture(const char* fileName, bool wrap)
-{
-	Image::Bmp bmp;
-	if (!bmp.read(fileName))
-		return 0;     
-
-	int width = bmp.getWidth();
-	int height = bmp.getHeight();
-	const unsigned char* data = bmp.getDataRGB();
-	GLenum type = GL_UNSIGNED_BYTE;  
-
-	GLenum format;
-	int bpp = bmp.getBitCount();
-	if (bpp == 8)
-		format = GL_LUMINANCE;
-	else if (bpp == 24)
-		format = GL_RGB;
-	else if (bpp == 32)
-		format = GL_RGBA;
-	else
-		return 0;               
-
-	GLuint texture;
-	glGenTextures(1, &texture);
-
-	glBindTexture(GL_TEXTURE_2D, texture);
-
-	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap ? GL_REPEAT : GL_CLAMP);
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap ? GL_REPEAT : GL_CLAMP);
-
-	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, type, data);
-
-	return texture;
-}
-
-
-void CSolarSystemView::OnDestroy()
-{
-	CView::OnDestroy();
-	wglMakeCurrent(m_hDC, NULL);
-	wglDeleteContext(m_hglRC);
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	if (ssTimer) {
-		KillTimer(1);
-		ssTimer = false;
-	}
-}
-
-
-void CSolarSystemView::OnSize(UINT nType, int cx, int cy)
-{
-	CView::OnSize(nType, cx, cy);
-
-	// TODO: 여기에 메시지 처리기 코드를 추가합니다.
-	//ReSizeGLScene(cx, cy);
-	ToPerspective(cx, cy);
-}
-
-void CSolarSystemView::ReSizeGLScene(GLsizei width, GLsizei height) {
-	glViewport(0, 0, width, height);
-
-	glMatrixMode(GL_PROJECTION); // 행렬 연산의 대상이 되는 스택을 Projection Stack 으로 변경
-	glLoadIdentity();
-
-	double screenRatio = (double)width / (double)height;
-
-	glFrustum(-screenRatio, screenRatio, -1.0f, 1.0f, 1.0f, 10000.0f); // 원근감을 주기 위해 카메라 시야각 설정
-}
-
-void ToOrtho(GLsizei width, GLsizei height)
+void CSolarSystemView::ToOrtho(GLsizei width, GLsizei height)
 {
 	const float N = -1.0f;
 	const float F = 1.0f;
@@ -588,7 +585,7 @@ void ToOrtho(GLsizei width, GLsizei height)
 	glLoadIdentity();
 }
 
-void ToPerspective(GLsizei width, GLsizei height)
+void CSolarSystemView::ToPerspective(GLsizei width, GLsizei height)
 {
 	const float N = 0.1f;
 	const float F = 100.0f;
@@ -620,101 +617,92 @@ void ToPerspective(GLsizei width, GLsizei height)
 	glLoadIdentity();
 }
 
+void CSolarSystemView::ReSizeGLScene(GLsizei width, GLsizei height) {
+	glViewport(0, 0, width, height);
 
-void CSolarSystemView::DrawGLScene(void)
-{
-	wglMakeCurrent(m_hDC, m_hglRC);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT| GL_STENCIL_BUFFER_BIT); // Color Buffer와 Depth Buffer에 존재하는 값을 초기화
+	glMatrixMode(GL_PROJECTION); // 행렬 연산의 대상이 되는 스택을 Projection Stack 으로 변경
+	glLoadIdentity();
 
-	SetCamera();
+	double screenRatio = (double)width / (double)height;
 
-	Display();
-
-	// 화면 갱신
-	SwapBuffers(m_hDC);
+	glFrustum(-screenRatio, screenRatio, -1.0f, 1.0f, 1.0f, 10000.0f); // 원근감을 주기 위해 카메라 시야각 설정
 }
 
-float lineColor[] = { 0.2f, 0.2f, 0.2f, 1 };
 
-void CSolarSystemView::Display() {
-	glGenBuffers(1, &vboId2);
-	glBindBuffer(GL_ARRAY_BUFFER, vboId2);
-	glBufferData(GL_ARRAY_BUFFER, sun.getInterleavedVertexSize(), sun.getInterleavedVertices(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glGenBuffers(1, &iboId2);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId2);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sun.getIndexSize(), sun.getIndices(), GL_STATIC_DRAW);
+GLuint CSolarSystemView::LoadTexture(const char* fileName, bool wrap)
+{
+	Image::Bmp bmp;
+	if (!bmp.read(fileName))
+		return 0;
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+	int width = bmp.getWidth();
+	int height = bmp.getHeight();
+	const unsigned char* data = bmp.getDataRGB();
+	GLenum type = GL_UNSIGNED_BYTE;
 
-	EarthTex = LoadTexture("bmp/earth.bmp", true);
+	GLenum format;
+	int bpp = bmp.getBitCount();
+	if (bpp == 8)
+		format = GL_LUMINANCE;
+	else if (bpp == 24)
+		format = GL_RGB;
+	else if (bpp == 32)
+		format = GL_RGBA;
+	else
+		return 0;
 
-	glPushMatrix();
-	// transform camera (view)
-	Matrix4 matrixView;
-	matrixView.translate(0, 0, -50);
+	GLuint texture;
+	glGenTextures(1, &texture);
 
-	// common model matrix
-	Matrix4 matrixModelCommon;
-	matrixModelCommon.rotateX(-90);
-	matrixModelCommon.rotateY(earthRot);
+	glBindTexture(GL_TEXTURE_2D, texture);
 
-	glPushMatrix();
-	// model matrix for each instance
-	Matrix4 EarthModel(matrixModelCommon);    // right
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
-	glUseProgram(shaderProgram);
-	glBindTexture(GL_TEXTURE_2D, EarthTex);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-	glEnableVertexAttribArray(attribVertexPosition);
-	glEnableVertexAttribArray(attribVertexNormal);
-	glEnableVertexAttribArray(attribVertexTexCoord);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap ? GL_REPEAT : GL_CLAMP);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap ? GL_REPEAT : GL_CLAMP);
 
-	glBindBuffer(GL_ARRAY_BUFFER, vboId2);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, iboId2);
+	glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, type, data);
 
-	int stride = sun.getInterleavedStride();
-	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
-	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+	return texture;
+}
 
-	matrixModelView = matrixView * EarthModel;
-	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
-	Matrix4 matrixNormal = matrixModelView;
-	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
-	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
-	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
-	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+void CSolarSystemView::ClearSharedMem()
+{
+	glDeleteBuffers(1, &vboId1);
+	glDeleteBuffers(1, &iboId1);
+	glDeleteBuffers(1, &vboId2);
+	glDeleteBuffers(1, &iboId2);
+	vboId1 = iboId1 = 0;
+	vboId2 = iboId2 = 0;
+}
 
-	glDrawElements(GL_TRIANGLES,           
-		sun.getIndexCount(), 
-		GL_UNSIGNED_INT,     
-		(void*)0);
-	glBindTexture(GL_TEXTURE_2D, 0);
+void CSolarSystemView::SetCamera()
+{
+	// 태양계 그리기
 
-	glDisableVertexAttribArray(attribVertexPosition);
-	glDisableVertexAttribArray(attribVertexNormal);
-	glDisableVertexAttribArray(attribVertexTexCoord);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
-	
-	glPopMatrix();
+	// World Coordinate Sys 조정
+	// 카메라 세팅
+	GLfloat rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
+	GLfloat posX = 0.0f, posY = 0.0f, posZ = 25.0f;
+
+	// 1번 스케일링
+	glScalef(1.0f, 1.0f, 1.0f);
+
+	// 2번 회전
+	glRotatef(rotX, 1, 0, 0);
+	glRotatef(rotY, 0, 1, 0);
+	glRotatef(rotZ, 0, 0, 1);
+
+	// 3번 이동
+	glTranslatef(-posX, -posY, -posZ);
 }
 
 void CSolarSystemView::RotateSphere(float rot) {
 	glRotatef(rot, 0.0f, 1.0f, 0.0f);
-}
-
-void CSolarSystemView::OnTimer(UINT_PTR nIDEvent)
-{
-	if (true) {
-		sunRot += 1;
-		earthRot += 5;
-		earthRot += 8;
-	}
-	Invalidate(FALSE);
-	CView::OnTimer(nIDEvent);
 }
