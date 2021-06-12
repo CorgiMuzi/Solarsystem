@@ -30,7 +30,7 @@ public:
 	bool InitSharedMem();
 	void ClearSharedMem();
 
-	void SetCamera();
+	//void SetCamera(GLfloat posX, GLfloat posY, GLfloat posZ, GLfloat rotX, GLfloat rotY, GLfloat rotZ);
 	void ReSizeGLScene(GLsizei width, GLsizei height);
 	void DrawGLScene(void);
 	void ToOrtho(GLsizei width, GLsizei height);
@@ -41,10 +41,16 @@ public:
 	void RotateSphere(float rot);
 	GLuint LoadTexture(const char* fileName, bool wrap = true);
 
+private : 
+	GLfloat rotX , rotY, rotZ;
+	GLfloat posX , posY, posZ;
+
  // 재정의입니다.
 public:
 	virtual void OnDraw(CDC* pDC);  // 이 뷰를 그리기 위해 재정의되었습니다.
 	virtual BOOL PreCreateWindow(CREATESTRUCT& cs);
+	virtual BOOL PreTranslateMessage(MSG* pMsg);
+
 protected:
 	virtual BOOL OnPreparePrinting(CPrintInfo* pInfo);
 	virtual void OnBeginPrinting(CDC* pDC, CPrintInfo* pInfo);
@@ -72,7 +78,6 @@ public:
 	afx_msg void OnDestroy();
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
-	
 };
 
 #ifndef _DEBUG  // SolarSystemView.cpp의 디버그 버전

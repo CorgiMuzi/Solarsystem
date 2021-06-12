@@ -153,7 +153,7 @@ void CSolarSystemView::Display() {
 	glPushMatrix();
 	// transform camera (view)
 	Matrix4 matrixView;
-	matrixView.translate(0, 0, -50);
+	matrixView.translate(-posX, -posY, -posZ);
 
 	// common model matrix
 	Matrix4 matrixModelCommon;
@@ -226,6 +226,8 @@ CSolarSystemView::CSolarSystemView() noexcept
 	:ssTimer(true)
 {
 	// TODO: 여기에 생성 코드를 추가합니다.
+	rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
+	posX = 0.0f, posY = 0.0f, posZ = 50.0f;
 }
 
 CSolarSystemView::~CSolarSystemView()
@@ -293,8 +295,7 @@ void CSolarSystemView::DrawGLScene(void)
 {
 	wglMakeCurrent(m_hDC, m_hglRC);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); // Color Buffer와 Depth Buffer에 존재하는 값을 초기화
-
-	SetCamera();
+	//SetCamera(posX, posY, posZ, rotX, rotY, rotZ);
 
 	Display();
 
@@ -679,30 +680,68 @@ void CSolarSystemView::ClearSharedMem()
 	vboId2 = iboId2 = 0;
 }
 
-void CSolarSystemView::SetCamera()
-{
-	// 태양계 그리기
-
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	// World Coordinate Sys 조정
-	// 카메라 세팅
-	GLfloat rotX = 0.0f, rotY = 0.0f, rotZ = 0.0f;
-	GLfloat posX = 0.0f, posY = 0.0f, posZ = 25.0f;
-
-	// 1번 스케일링
-	glScalef(1.0f, 1.0f, 1.0f);
-
-	// 2번 회전
-	glRotatef(rotX, 1, 0, 0);
-	glRotatef(rotY, 0, 1, 0);
-	glRotatef(rotZ, 0, 0, 1);
-
-	// 3번 이동
-	glTranslatef(-posX, -posY, -posZ);
-}
-
 void CSolarSystemView::RotateSphere(float rot) {
 	glRotatef(rot, 0.0f, 1.0f, 0.0f);
 }
+
+BOOL CSolarSystemView::PreTranslateMessage(MSG* pMsg)
+{
+	if (pMsg->message == WM_KEYDOWN)
+	{
+		switch (pMsg->wParam) {
+		case VK_LEFT:
+			posX += -0.5f;
+			return TRUE;
+			break;
+
+		case VK_RIGHT:
+			posX += 0.5f;
+			return TRUE;
+			break;
+
+		case VK_UP:
+			posY += 0.5f;
+			return TRUE;
+			break;
+
+		case VK_DOWN:
+			posY += -0.5f;
+			return TRUE;
+			break;
+
+		case VK_F1:
+			posZ += 0.5f;
+			return TRUE;
+			break;
+
+		case VK_F2:
+			posZ += -0.5f;
+			return TRUE;
+			break;
+		default:
+			return FALSE;
+		}
+	}
+	return CView::PreTranslateMessage(pMsg);
+}
+
+//void CSolarSystemView::SetCamera(GLfloat posX, GLfloat posY, GLfloat posZ, GLfloat rotX, GLfloat rotY, GLfloat rotZ)
+//{
+//	// 태양계 그리기
+//
+//	glMatrixMode(GL_MODELVIEW);
+//	glLoadIdentity();
+//
+//	// World Coordinate Sys 조정
+//	// 카메라 세팅
+//		// 1번 스케일링
+//	glScalef(1.0f, 1.0f, 1.0f);
+//
+//	// 2번 회전
+//	glRotatef(rotX, 1, 0, 0);
+//	glRotatef(rotY, 0, 1, 0);
+//	glRotatef(rotZ, 0, 0, 1);
+//
+//	// 3번 이동
+//	glTranslatef(-posX, -posY, -posZ);
+//}
