@@ -27,18 +27,25 @@ public:
 	bool InitGLSL();
 	void InitLights();
 
-	bool InitSharedMem();
-	void ClearSharedMem();
-
-	//void SetCamera(GLfloat posX, GLfloat posY, GLfloat posZ, GLfloat rotX, GLfloat rotY, GLfloat rotZ);
+	void ClearBufferMem();
+	
+	void GetTextures();
 	void ReSizeGLScene(GLsizei width, GLsizei height);
 	void DrawGLScene(void);
 	void ToOrtho(GLsizei width, GLsizei height);
 	void ToPerspective(GLsizei width, GLsizei height);
-
 	void Display();
 
-	void RotateSphere(float rot);
+	void DrawSun();
+	void DrawMercury();
+	void DrawVenus();
+	void DrawEarth();
+	void DrawMars();
+	void DrawJupiter();
+	void DrawSaturn();
+	void DrawUranus();
+	void DrawNeptune();
+
 	GLuint LoadTexture(const char* fileName, bool wrap = true);
 
 private : 
