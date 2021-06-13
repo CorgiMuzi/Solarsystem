@@ -39,12 +39,12 @@ public:
 
     unsigned int getInterleavedVertexCount() const { return getVertexCount(); }    // # of vertices
     unsigned int getInterleavedVertexSize() const { return (unsigned int)interleavedVertices.size() * sizeof(float); }    // # of bytes
-    int getInterleavedStride() const { return interleavedStride; }   // should be 32 bytes
+    int getInterleavedStride() const { return interleavedStride; }   // 32 bytes
     const float* getInterleavedVertices() const { return interleavedVertices.data(); }
 
-    void draw(const float lineColor[4]) const;                                  // draw surface
-    void drawLines(const float lineColor[4]) const;     // draw lines only
-    void drawWithLines(const float lineColor[4]) const; // draw surface and lines
+    void draw() const;                                  // draw surface
+    //void drawLines(const float lineColor[4]) const;     // draw lines only
+    //void drawWithLines(const float lineColor[4]) const; // draw surface and lines
 
 private : 
     float radius;

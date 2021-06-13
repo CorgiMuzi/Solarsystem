@@ -128,7 +128,6 @@ const float DEFAULT_TIME_SPEED = 1.0f;
 #pragma endregion
 
 #pragma region Sphere_Properties
-float lineColor[] = { 0.2f, 0.2f, 0.2f, 1 };
 Sphere sun(17.109f, 36, 18);
 Sphere mercury(0.6f, 36, 18);
 Sphere venus(1.5f, 36, 18);
@@ -314,16 +313,16 @@ void CSolarSystemView::DrawGLScene(void)
 }
 
 void CSolarSystemView::GetTextures() {
-	sunTex = LoadTexture("bmp/sun.bmp", true);
-	mercuryTex = LoadTexture("bmp/mercury.bmp", true);
-	venusTex = LoadTexture("bmp/venus.bmp", true);
-	earthTex = LoadTexture("bmp/earth.bmp", true);
-	moonTex = LoadTexture("bmp/moon.bmp", true);
-	marsTex = LoadTexture("bmp/mars.bmp", true);
-	jupiterTex = LoadTexture("bmp/jupiter.bmp", true);
-	saturnTex = LoadTexture("bmp/saturn.bmp", true);
-	uranusTex = LoadTexture("bmp/uranus.bmp", true);
-	neptuneTex = LoadTexture("bmp/neptune.bmp", true);
+	sunTex = LoadTexture("C:/Users/김지헌/Documents/Github/SolarSystem/Solarsystem/bmp/sun.bmp", true);
+	mercuryTex = LoadTexture("C:/Users/김지헌/Documents/Github/SolarSystem/Solarsystem/bmp/mercury.bmp", true);
+	venusTex = LoadTexture("C:/Users/김지헌/Documents/Github/SolarSystem/Solarsystem/bmp/venus.bmp", true);
+	earthTex = LoadTexture("C:/Users/김지헌/Documents/Github/SolarSystem/Solarsystem/bmp/earth.bmp", true);
+	moonTex = LoadTexture("C:/Users/김지헌/Documents/Github/SolarSystem/Solarsystem/bmp/moon.bmp", true);
+	marsTex = LoadTexture("C:/Users/김지헌/Documents/Github/SolarSystem/Solarsystem/bmp/mars.bmp", true);
+	jupiterTex = LoadTexture("C:/Users/김지헌/Documents/Github/SolarSystem/Solarsystem/bmp/jupiter.bmp", true);
+	saturnTex = LoadTexture("C:/Users/김지헌/Documents/Github/SolarSystem/Solarsystem/bmp/saturn.bmp", true);
+	uranusTex = LoadTexture("C:/Users/김지헌/Documents/Github/SolarSystem/Solarsystem/bmp/uranus.bmp", true);
+	neptuneTex = LoadTexture("C:/Users/김지헌/Documents/Github/SolarSystem/Solarsystem/bmp/neptune.bmp", true);
 }
 
 void CSolarSystemView::SetCamera() {
@@ -443,6 +442,7 @@ void CSolarSystemView::InitGL()
 
 	InitLights();
 
+	glewExperimental = TRUE;
 	GLenum err = glewInit();
 }
 
@@ -538,21 +538,19 @@ void CSolarSystemView::InitLights() {
 	glShadeModel(GL_SMOOTH);
 	glEnable(GL_CULL_FACE);
 
-	GLfloat lightKa[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	GLfloat lightKd[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	GLfloat lightKs[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	glPushMatrix();
+	GLfloat ambient[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	GLfloat diffuse[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	GLfloat specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	glLoadIdentity();
-	glLightfv(GL_LIGHT0, GL_AMBIENT, lightKa);
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightKd);
-	glLightfv(GL_LIGHT0, GL_SPECULAR, lightKs);
+	glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+	glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+	glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
 
 	float lightPos[4] = { 0, 0, 1, 0};
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 
 	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
-	glPopMatrix();
 }
 
 void CSolarSystemView::InitMembers()
@@ -628,7 +626,7 @@ void CSolarSystemView::ToPerspective(GLsizei width, GLsizei height)
 void CSolarSystemView::ReSizeGLScene(GLsizei width, GLsizei height) {
 	glViewport(0, 0, width, height);
 
-	glMatrixMode(GL_PROJECTION); // 행렬 연산의 대상이 되는 스택을 Projection Stack 으로 변경
+	glMatrixMode(GL_PROJECTION);										// 행렬 연산의 대상이 되는 스택을 Projection Stack 으로 변경
 	glLoadIdentity();
 
 	screenWidth = width;
@@ -636,7 +634,7 @@ void CSolarSystemView::ReSizeGLScene(GLsizei width, GLsizei height) {
 
 	double screenRatio = (double)screenWidth / (double)screenHeight;
 
-	glFrustum(-screenRatio, screenRatio, -1.0f, 1.0f, 1.0f, 10000.0f); // 원근감을 주기 위해 카메라 시야각 설정
+	glFrustum(-screenRatio, screenRatio, -1.0f, 1.0f, 1.0f, 10000.0f);	// 원근감을 주기 위해 카메라 시야각 설정
 }
 
 GLuint CSolarSystemView::LoadTexture(const char* fileName, bool wrap)
@@ -1434,163 +1432,162 @@ BOOL CSolarSystemView::PreTranslateMessage(MSG* pMsg)
 //}
 
 void CSolarSystemView::Display() {
-	
-	//glPushMatrix();
-	//	glTranslatef(cameraX, cameraY, -cameraDistance);
-	//	glRotatef(cameraAngleX, 1, 0, 0);
-	//	glRotatef(cameraAngleY, 0, 1, 0);
+		glPushMatrix();
+		glTranslatef(cameraX, cameraY, -cameraDistance);
+		glRotatef(cameraAngleX, 1, 0, 0);
+		glRotatef(cameraAngleY, 0, 1, 0);
 
-	//	// 태양
-	//	glPushMatrix();
-	//		glRotatef(-90, 1, 0, 0);
-	//		glTranslatef(-1.0f, 0.0f, 0.0f);
+		// 태양
+		glPushMatrix();
+			glRotatef(-90, 1, 0, 0);
+			glTranslatef(-1.0f, 0.0f, 0.0f);
 
-	//		glRotatef(sunRot, 0, 0, 1);
-	//		
+			glRotatef(sunRot, 0, 0, 1);
+			
 
-	//		glMaterialfv(GL_FRONT, GL_AMBIENT, matAmbient);
-	//		glMaterialfv(GL_FRONT, GL_DIFFUSE, matDiff);
-	//		glMaterialfv(GL_FRONT, GL_SPECULAR, matSpecular);
-	//		glBindTexture(GL_TEXTURE_2D, sunTex);
-	//		sun.draw(lineColor);
-	//		glBindTexture(GL_TEXTURE_2D, 0);
-	//	glPopMatrix();
-
-
-	//	// 수성
-	//	glPushMatrix();
-	//		glRotatef(-90, 1, 0, 0);
-	//		glRotatef(mercuryRevolve, 0, 0, 1);
-	//		glTranslatef(21.7f, 0.0f, 0.0f);
-
-	//		glPushMatrix();
-	//			glRotatef(mercuryRot, 0, 0, 1);
-	//			glBindTexture(GL_TEXTURE_2D, mercuryTex);
-	//			mercury.draw(lineColor);
-	//			glBindTexture(GL_TEXTURE_2D, 0);
-	//		glPopMatrix();
-
-	//	glPopMatrix();
+			glMaterialfv(GL_FRONT, GL_AMBIENT, matAmbient);
+			glMaterialfv(GL_FRONT, GL_DIFFUSE, matDiff);
+			glMaterialfv(GL_FRONT, GL_SPECULAR, matSpecular);
+			glBindTexture(GL_TEXTURE_2D, sunTex);
+			sun.draw();
+			glBindTexture(GL_TEXTURE_2D, 0);
+		glPopMatrix();
 
 
-	//	// 금성
-	//	glPushMatrix();
-	//		glRotatef(-90, 1, 0, 0);
-	//		glRotatef(venusRevolve, 0, 0, 1);
-	//		glTranslatef(31, 0.0f, 0.0f);
+		// 수성
+		glPushMatrix();
+			glRotatef(-90, 1, 0, 0);
+			glRotatef(mercuryRevolve, 0, 0, 1);
+			glTranslatef(21.7f, 0.0f, 0.0f);
+
+			glPushMatrix();
+				glRotatef(mercuryRot, 0, 0, 1);
+				glBindTexture(GL_TEXTURE_2D, mercuryTex);
+				mercury.draw();
+				glBindTexture(GL_TEXTURE_2D, 0);
+			glPopMatrix();
+
+		glPopMatrix();
 
 
-	//		glPushMatrix();
-	//			glRotatef(venusRot, 0, 0, 1);
-	//			glBindTexture(GL_TEXTURE_2D, venusTex);
-	//			venus.draw(lineColor);
-	//			glBindTexture(GL_TEXTURE_2D, 0);
-	//		glPopMatrix();
-	//	glPopMatrix();
+		// 금성
+		glPushMatrix();
+			glRotatef(-90, 1, 0, 0);
+			glRotatef(venusRevolve, 0, 0, 1);
+			glTranslatef(31, 0.0f, 0.0f);
 
 
-	//	// 지구
-	//	glPushMatrix();
-	//		glRotatef(-90, 1, 0, 0);
-	//		glRotatef(earthRevolve, 0, 0, 1);
-	//		glTranslatef(40, 0.0f, 0.0f);
-
-	//		glPushMatrix();
-	//			glRotatef(earthRot, 0, 0, 1);
-	//			glBindTexture(GL_TEXTURE_2D, earthTex);
-	//			earth.draw(lineColor);
-	//			glBindTexture(GL_TEXTURE_2D, 0);
-
-	//			// 달
-	///*			glPushMatrix();
-	//				glRotatef(-90, 0, 1, 0);
-	//				glRotatef(moonRevolve, 0, 1, 0);
-	//				glTranslatef(0.0f, 3.8f, 0.0f);
-
-	//				glPushMatrix();
-	//					glRotatef(moonRot, 0, 1, 0);
-	//					glBindTexture(GL_TEXTURE_2D, moonTex);
-	//					moon.draw(lineColor);
-	//					glBindTexture(GL_TEXTURE_2D, 0);
-	//				glPopMatrix();
-	//			glPopMatrix();*/
-	//		glPopMatrix();
-	//	glPopMatrix();
+			glPushMatrix();
+				glRotatef(venusRot, 0, 0, 1);
+				glBindTexture(GL_TEXTURE_2D, venusTex);
+				venus.draw();
+				glBindTexture(GL_TEXTURE_2D, 0);
+			glPopMatrix();
+		glPopMatrix();
 
 
-	//	// 화성
-	//	glPushMatrix();
-	//		glRotatef(-90, 1, 0, 0);
-	//		glRotatef(marsRevolve, 0, 0, 1);
-	//		glTranslatef(45.6f, 0.0f, 0.0f);
+		// 지구
+		glPushMatrix();
+			glRotatef(-90, 1, 0, 0);
+			glRotatef(earthRevolve, 0, 0, 1);
+			glTranslatef(40, 0.0f, 0.0f);
 
-	//		glPushMatrix();
-	//			glRotatef(marsRot, 0, 0, 1);
-	//			glBindTexture(GL_TEXTURE_2D, marsTex);
-	//			mars.draw(lineColor);
-	//			glBindTexture(GL_TEXTURE_2D, 0);
-	//		glPopMatrix();
-	//	glPopMatrix();
+			glPushMatrix();
+				glRotatef(earthRot, 0, 0, 1);
+				glBindTexture(GL_TEXTURE_2D, earthTex);
+				earth.draw();
+				glBindTexture(GL_TEXTURE_2D, 0);
 
+				// 달
+	/*			glPushMatrix();
+					glRotatef(-90, 0, 1, 0);
+					glRotatef(moonRevolve, 0, 1, 0);
+					glTranslatef(0.0f, 3.8f, 0.0f);
 
-	//	// 목성
-	//	glPushMatrix();
-	//		glRotatef(-90, 1, 0, 0);
-	//		glRotatef(jupiterRevolve, 0, 0, 1);
-	//		glTranslatef(85.0f, 0.0f, 0.0f);
-
-	//		glPushMatrix();
-	//			glRotatef(jupiterRot, 0, 0, 1);
-	//			glBindTexture(GL_TEXTURE_2D, jupiterTex);
-	//			jupiter.draw(lineColor);
-	//			glBindTexture(GL_TEXTURE_2D, 0);
-	//		glPopMatrix();
-	//	glPopMatrix();
-
-
-	//	// 토성
-	//	glPushMatrix();
-	//		glRotatef(-90, 1, 0, 0);
-	//		glRotatef(saturnRevolve, 0, 0, 1);
-	//		glTranslatef(150.0f, 0.0f, 0.0f);
-
-	//		glPushMatrix();
-	//			glRotatef(saturnRot, 0, 0, 1);
-	//			glBindTexture(GL_TEXTURE_2D, saturnTex);
-	//			saturn.draw(lineColor);
-	//			glBindTexture(GL_TEXTURE_2D, 0);
-	//		glPopMatrix();
-	//	glPopMatrix();
+					glPushMatrix();
+						glRotatef(moonRot, 0, 1, 0);
+						glBindTexture(GL_TEXTURE_2D, moonTex);
+						moon.draw(lineColor);
+						glBindTexture(GL_TEXTURE_2D, 0);
+					glPopMatrix();
+				glPopMatrix();*/
+			glPopMatrix();
+		glPopMatrix();
 
 
-	//	// 천왕성
-	//	glPushMatrix();
-	//		glRotatef(-90, 1, 0, 0);
-	//		glRotatef(uranusRevolve, 0, 0, 1);
-	//		glTranslatef(300.0f, 0.0f, 0.0f);
+		// 화성
+		glPushMatrix();
+			glRotatef(-90, 1, 0, 0);
+			glRotatef(marsRevolve, 0, 0, 1);
+			glTranslatef(45.6f, 0.0f, 0.0f);
 
-	//		glPushMatrix();
-	//			glRotatef(uranusRot, 0, 0, 1);
-	//			glBindTexture(GL_TEXTURE_2D, uranusTex);
-	//			uranus.draw(lineColor);
-	//			glBindTexture(GL_TEXTURE_2D, 0);
-	//		glPopMatrix();
-	//	glPopMatrix();
+			glPushMatrix();
+				glRotatef(marsRot, 0, 0, 1);
+				glBindTexture(GL_TEXTURE_2D, marsTex);
+				mars.draw();
+				glBindTexture(GL_TEXTURE_2D, 0);
+			glPopMatrix();
+		glPopMatrix();
 
 
-	//	// 해왕성
-	//	glPushMatrix();
-	//		glRotatef(-90, 1, 0, 0);
-	//		glRotatef(neptuneRevolve, 0, 0, 1);
-	//		glTranslatef(450.0f, 0.0f, 0.0f);
+		// 목성
+		glPushMatrix();
+			glRotatef(-90, 1, 0, 0);
+			glRotatef(jupiterRevolve, 0, 0, 1);
+			glTranslatef(85.0f, 0.0f, 0.0f);
 
-	//		glPushMatrix();
-	//			glRotatef(neptuneRot, 0, 0, 1);
-	//			glBindTexture(GL_TEXTURE_2D, neptuneTex);
-	//			neptune.draw(lineColor);
-	//			glBindTexture(GL_TEXTURE_2D, 0);
-	//		glPopMatrix();
+			glPushMatrix();
+				glRotatef(jupiterRot, 0, 0, 1);
+				glBindTexture(GL_TEXTURE_2D, jupiterTex);
+				jupiter.draw();
+				glBindTexture(GL_TEXTURE_2D, 0);
+			glPopMatrix();
+		glPopMatrix();
 
-	//	glPopMatrix();
-	//glPopMatrix();
+
+		// 토성
+		glPushMatrix();
+			glRotatef(-90, 1, 0, 0);
+			glRotatef(saturnRevolve, 0, 0, 1);
+			glTranslatef(150.0f, 0.0f, 0.0f);
+
+			glPushMatrix();
+				glRotatef(saturnRot, 0, 0, 1);
+				glBindTexture(GL_TEXTURE_2D, saturnTex);
+				saturn.draw();
+				glBindTexture(GL_TEXTURE_2D, 0);
+			glPopMatrix();
+		glPopMatrix();
+
+
+		// 천왕성
+		glPushMatrix();
+			glRotatef(-90, 1, 0, 0);
+			glRotatef(uranusRevolve, 0, 0, 1);
+			glTranslatef(300.0f, 0.0f, 0.0f);
+
+			glPushMatrix();
+				glRotatef(uranusRot, 0, 0, 1);
+				glBindTexture(GL_TEXTURE_2D, uranusTex);
+				uranus.draw();
+				glBindTexture(GL_TEXTURE_2D, 0);
+			glPopMatrix();
+		glPopMatrix();
+
+
+		// 해왕성
+		glPushMatrix();
+			glRotatef(-90, 1, 0, 0);
+			glRotatef(neptuneRevolve, 0, 0, 1);
+			glTranslatef(450.0f, 0.0f, 0.0f);
+
+			glPushMatrix();
+				glRotatef(neptuneRot, 0, 0, 1);
+				glBindTexture(GL_TEXTURE_2D, neptuneTex);
+				neptune.draw();
+				glBindTexture(GL_TEXTURE_2D, 0);
+			glPopMatrix();
+
+		glPopMatrix();
+	glPopMatrix();
 }
