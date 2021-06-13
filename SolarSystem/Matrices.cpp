@@ -1,23 +1,3 @@
-///////////////////////////////////////////////////////////////////////////////
-// Matrice.cpp
-// ===========
-// NxN Matrix Math classes
-//
-// The elements of the matrix are stored as column major order.
-// | 0 2 |    | 0 3 6 |    |  0  4  8 12 |
-// | 1 3 |    | 1 4 7 |    |  1  5  9 13 |
-//            | 2 5 8 |    |  2  6 10 14 |
-//                         |  3  7 11 15 |
-//
-// Dependencies: Vector2, Vector3, Vector3
-//
-//  AUTHOR: Song Ho Ahn (song.ahn@gmail.com)
-// CREATED: 2005-06-24
-// UPDATED: 2017-06-27
-//
-// Copyright (C) 2005 Song Ho Ahn
-///////////////////////////////////////////////////////////////////////////////
-
 #include "pch.h"
 #include <cmath>
 #include <algorithm>
@@ -27,52 +7,48 @@ const float DEG2RAD = 3.141593f / 180.0f;
 const float RAD2DEG = 180.0f / 3.141593f;
 const float EPSILON = 0.00001f;
 
-
-
 ///////////////////////////////////////////////////////////////////////////////
-// transpose 2x2 matrix
+// 2x2 전치 행렬 구하기
+// | m[0] m[1] |   ==>  | m[0] m[2] |
+// | m[2] m[3] |        | m[1] m[3] |
 ///////////////////////////////////////////////////////////////////////////////
-Matrix2& Matrix2::transpose()
+Matrix2& Matrix2::transpose() 
 {
     std::swap(m[1], m[2]);
     return *this;
 }
 
-
-
 ///////////////////////////////////////////////////////////////////////////////
-// return the determinant of 2x2 matrix
+// 2x2 행렬식 반환
 ///////////////////////////////////////////////////////////////////////////////
 float Matrix2::getDeterminant() const
 {
     return m[0] * m[3] - m[1] * m[2];
 }
 
-
-
 ///////////////////////////////////////////////////////////////////////////////
-// inverse of 2x2 matrix
-// If cannot find inverse, set identity matrix
+// 2x2 역행렬 구하기
+// 만약 역행렬을 구할 수 없다면 단위 행렬 반환
+// | m[0] m[1] |  ==>  | (invDet * m[3])  (-invDet * m[1]) | 
+// | m[2] m[3] |       | (-invDet * m[2])  (invDet * m[0]) |
 ///////////////////////////////////////////////////////////////////////////////
 Matrix2& Matrix2::invert()
 {
     float determinant = getDeterminant();
-    if (fabs(determinant) <= EPSILON)
+    if (fabs(determinant) <= EPSILON)    // 행렬식 반환값의 절댓값
     {
         return identity();
     }
 
-    float tmp = m[0];   // copy the first element
+    float temp = m[0]; 
     float invDeterminant = 1.0f / determinant;
     m[0] = invDeterminant * m[3];
     m[1] = -invDeterminant * m[1];
     m[2] = -invDeterminant * m[2];
-    m[3] = invDeterminant * tmp;
+    m[3] = invDeterminant * temp;
 
     return *this;
 }
-
-
 
 ///////////////////////////////////////////////////////////////////////////////
 // retrieve rotation angle in degree from rotation matrix, R

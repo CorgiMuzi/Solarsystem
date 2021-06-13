@@ -108,6 +108,17 @@ GLuint sunTex, mercuryTex, venusTex, earthTex, marsTex, jupiterTex, saturnTex, u
 
 Matrix4 matrixModelView;
 Matrix4 matrixProjection;
+
+int screenWidth;
+int screenHeight;
+float mouseX, mouseY;
+float cameraAngleX;
+float cameraAngleY;
+float cameraDistance;
+
+const int   SCREEN_WIDTH = 1500;
+const int   SCREEN_HEIGHT = 500;
+const float CAMERA_DISTANCE = 20.0f;
 #pragma endregion
 
 #pragma region Sphere_Properties
@@ -249,7 +260,9 @@ int CSolarSystemView::OnCreate(LPCREATESTRUCT lpCreateStruct)
 		SetTimer(1, 100, NULL);
 	}
 
+	InitMembers();
 	GetTextures();
+
 	InitGL();
 	InitGLSL();
 
@@ -303,6 +316,10 @@ void CSolarSystemView::GetTextures() {
 	saturnTex = LoadTexture("bmp/saturn.bmp", true);
 	uranusTex = LoadTexture("bmp/uranus.bmp", true);
 	neptuneTex = LoadTexture("bmp/neptune.bmp", true);
+}
+
+void CSolarSystemView::SetCamera() {
+	// gluLookAt 구현 파트
 }
 
 // CSolarSystemView 인쇄
@@ -578,7 +595,10 @@ void CSolarSystemView::ReSizeGLScene(GLsizei width, GLsizei height) {
 	glMatrixMode(GL_PROJECTION); // 행렬 연산의 대상이 되는 스택을 Projection Stack 으로 변경
 	glLoadIdentity();
 
-	double screenRatio = (double)width / (double)height;
+	screenWidth = width;
+	screenHeight = height;
+
+	double screenRatio = (double)screenWidth / (double)screenHeight;
 
 	glFrustum(-screenRatio, screenRatio, -1.0f, 1.0f, 1.0f, 10000.0f); // 원근감을 주기 위해 카메라 시야각 설정
 }
@@ -623,30 +643,13 @@ GLuint CSolarSystemView::LoadTexture(const char* fileName, bool wrap)
 	return texture;
 }
 
-void CSolarSystemView::ClearBufferMem()
+void CSolarSystemView::InitMembers()
 {
-	glDeleteBuffers(1, &sunVBO);
-	glDeleteBuffers(1, &mercuryVBO);
-	glDeleteBuffers(1, &venusVBO);
-	glDeleteBuffers(1, &earthVBO);
-	glDeleteBuffers(1, &marsVBO);
-	glDeleteBuffers(1, &jupiterVBO);
-	glDeleteBuffers(1, &saturnVBO);
-	glDeleteBuffers(1, &uranusVBO);
-	glDeleteBuffers(1, &neptuneVBO);
+	screenWidth = SCREEN_WIDTH;
+	screenHeight = SCREEN_HEIGHT;
 
-	glDeleteBuffers(1, &sunIBO);
-	glDeleteBuffers(1, &mercuryIBO);
-	glDeleteBuffers(1, &venusIBO);
-	glDeleteBuffers(1, &earthIBO);
-	glDeleteBuffers(1, &marsIBO);
-	glDeleteBuffers(1, &jupiterIBO);
-	glDeleteBuffers(1, &saturnIBO);
-	glDeleteBuffers(1, &uranusIBO);
-	glDeleteBuffers(1, &neptuneIBO);
-
-	sunVBO = mercuryVBO = venusVBO = earthVBO = marsVBO = jupiterVBO = saturnVBO = uranusVBO = neptuneVBO = 0;
-	sunIBO = mercuryIBO = venusIBO = earthIBO = marsIBO = jupiterIBO = saturnIBO = uranusIBO = neptuneIBO = 0;
+	cameraAngleX = cameraAngleY = 0.0f;
+	cameraDistance = CAMERA_DISTANCE;
 }
 
 BOOL CSolarSystemView::PreTranslateMessage(MSG* pMsg)
@@ -675,23 +678,31 @@ BOOL CSolarSystemView::PreTranslateMessage(MSG* pMsg)
 			break;
 
 		case VK_F1:
-			posZ += 0.5f;
+			cameraAngleY += 0.5f;
 			return TRUE;
 			break;
 
 		case VK_F2:
-			posZ += -0.5f;
+			cameraAngleY += -0.5f;
 			return TRUE;
 			break;
 
 		case VK_F3:
-			rotY += -0.5f;
+			cameraAngleX += 0.5f;
 			return TRUE;
 			break;
 
 		case VK_F4:
-			rotY += 0.5f;
+			cameraAngleX += -0.5f;
 			return TRUE;
+			break;
+
+		case VK_F5:
+			cameraDistance += 0.5f;
+			break;
+
+		case VK_F6:
+			cameraDistance += -0.5f;
 			break;
 
 		default:
@@ -701,664 +712,673 @@ BOOL CSolarSystemView::PreTranslateMessage(MSG* pMsg)
 	return CView::PreTranslateMessage(pMsg);
 }
 
-void CSolarSystemView::DrawSun() {
-	glGenBuffers(1, &sunVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
-	glBufferData(GL_ARRAY_BUFFER, sun.getInterleavedVertexSize(), sun.getInterleavedVertices(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glGenBuffers(1, &sunIBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sunIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sun.getIndexSize(), sun.getIndices(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	// transform camera (view)
-	Matrix4 matrixView;
-	matrixView.translate(-posX, -posY, -posZ);
-	matrixView.rotateY(rotY);
-
-	// common model matrix
-	Matrix4 ModelMatrix;
-	ModelMatrix.rotateX(-90);
-	ModelMatrix.rotateY(sunRot);
-	ModelMatrix.rotateZ(7.25);
-
-	glPushMatrix();
-	// model matrix for each instance
-	Matrix4 SunModel(ModelMatrix);    // right
-
-	glUseProgram(shaderProgram);
-	glBindTexture(GL_TEXTURE_2D, sunTex);
-
-	glEnableVertexAttribArray(attribVertexPosition);
-	glEnableVertexAttribArray(attribVertexNormal);
-	glEnableVertexAttribArray(attribVertexTexCoord);
-
-	glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sunIBO);
-
-	int stride = sun.getInterleavedStride();
-	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
-	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
-
-	matrixModelView = matrixView * SunModel;
-	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
-	Matrix4 matrixNormal = matrixModelView;
-	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
-	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
-	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
-	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
-
-	glDrawElements(GL_TRIANGLES,
-		sun.getIndexCount(),
-		GL_UNSIGNED_INT,
-		(void*)0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glDisableVertexAttribArray(attribVertexPosition);
-	glDisableVertexAttribArray(attribVertexNormal);
-	glDisableVertexAttribArray(attribVertexTexCoord);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
-
-	glPopMatrix();
-}
-
-void CSolarSystemView::DrawMercury() {
-	glGenBuffers(1, &mercuryVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, mercuryVBO);
-	glBufferData(GL_ARRAY_BUFFER, mercury.getInterleavedVertexSize(), mercury.getInterleavedVertices(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glGenBuffers(1, &mercuryIBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mercuryIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, mercury.getIndexSize(), mercury.getIndices(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	// transform camera (view)
-	Matrix4 matrixView;
-	matrixView.translate(-posX, -posY, -posZ);
-	matrixView.rotateY(rotY);
-
-	// common model matrix
-	Matrix4 ModelMatrix;
-	ModelMatrix.rotateX(-90);
-	ModelMatrix.rotateZ(0.01); // 자전 기울기
-
-	ModelMatrix.rotateY(mercuryRevolve);
-	ModelMatrix.translate(17.109 + 7.8, 0, 0);
-	ModelMatrix.rotateY(-mercuryRevolve);
-
-	ModelMatrix.rotateY(mercuryRot);
-
-	glPushMatrix();
-	// model matrix for each instance
-	Matrix4 MercuryModel(ModelMatrix);
-
-	glUseProgram(shaderProgram);
-	glBindTexture(GL_TEXTURE_2D, mercuryTex);
-
-	glEnableVertexAttribArray(attribVertexPosition);
-	glEnableVertexAttribArray(attribVertexNormal);
-	glEnableVertexAttribArray(attribVertexTexCoord);
-
-	glBindBuffer(GL_ARRAY_BUFFER, mercuryVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mercuryIBO);
-
-	int stride = mercury.getInterleavedStride();
-	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
-	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
-
-	matrixModelView = matrixView * MercuryModel;
-	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
-	Matrix4 matrixNormal = matrixModelView;
-	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
-	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
-	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
-	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
-
-	glDrawElements(GL_TRIANGLES,
-		mercury.getIndexCount(),
-		GL_UNSIGNED_INT,
-		(void*)0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glDisableVertexAttribArray(attribVertexPosition);
-	glDisableVertexAttribArray(attribVertexNormal);
-	glDisableVertexAttribArray(attribVertexTexCoord);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
-
-	glPopMatrix();
-}
-
-void CSolarSystemView::DrawVenus() {
-
-	glGenBuffers(1, &venusVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, venusVBO);
-	glBufferData(GL_ARRAY_BUFFER, venus.getInterleavedVertexSize(), venus.getInterleavedVertices(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glGenBuffers(1, &venusIBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, venusIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, venus.getIndexSize(), venus.getIndices(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	// transform camera (view)
-	Matrix4 matrixView;
-	matrixView.translate(-posX, -posY, -posZ);
-	matrixView.rotateY(rotY);
-
-	// common model matrix
-	Matrix4 ModelMatrix;
-	ModelMatrix.rotateX(-90);
-	ModelMatrix.rotateZ(-2.64);
-
-	ModelMatrix.rotateY(venusRevolve);
-	ModelMatrix.translate(17.109 + 14, 0, 0);
-	ModelMatrix.rotateY(-venusRevolve);
-
-	ModelMatrix.rotateY(venusRot);
-
-	glPushMatrix();
-	// model matrix for each instance
-	Matrix4 VenusModel(ModelMatrix);    // right
-
-	glUseProgram(shaderProgram);
-	glBindTexture(GL_TEXTURE_2D, venusTex);
-
-	glEnableVertexAttribArray(attribVertexPosition);
-	glEnableVertexAttribArray(attribVertexNormal);
-	glEnableVertexAttribArray(attribVertexTexCoord);
-
-	glBindBuffer(GL_ARRAY_BUFFER, venusVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, venusIBO);
-
-	int stride = venus.getInterleavedStride();
-	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
-	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
-
-	matrixModelView = matrixView * VenusModel;
-	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
-	Matrix4 matrixNormal = matrixModelView;
-	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
-	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
-	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
-	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
-
-	glDrawElements(GL_TRIANGLES,
-		venus.getIndexCount(),
-		GL_UNSIGNED_INT,
-		(void*)0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glDisableVertexAttribArray(attribVertexPosition);
-	glDisableVertexAttribArray(attribVertexNormal);
-	glDisableVertexAttribArray(attribVertexTexCoord);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
-
-	glPopMatrix();
-}
-
-void CSolarSystemView::DrawEarth() {
-
-	glGenBuffers(1, &earthVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, earthVBO);
-	glBufferData(GL_ARRAY_BUFFER, earth.getInterleavedVertexSize(), earth.getInterleavedVertices(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glGenBuffers(1, &earthIBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, earthIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, earth.getIndexSize(), earth.getIndices(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	// transform camera (view)
-	Matrix4 matrixView;
-	matrixView.translate(-posX, -posY, -posZ);
-	matrixView.rotateY(rotY);
-
-	// common model matrix
-	Matrix4 ModelMatrix;
-	ModelMatrix.rotateX(-90);
-	ModelMatrix.rotateZ(-23.44);
-
-	ModelMatrix.rotateY(earthRevolve);
-	ModelMatrix.translate(17.109 + 20, 0, 0); // 궤도 장반경
-	ModelMatrix.rotateY(-earthRevolve);
-
-	ModelMatrix.rotateY(earthRot);   // 자전 속도
-
-	glPushMatrix();
-	// model matrix for each instance
-	Matrix4 EarthModel(ModelMatrix);
-
-	glUseProgram(shaderProgram);
-	glBindTexture(GL_TEXTURE_2D, earthTex);
-
-	glEnableVertexAttribArray(attribVertexPosition);
-	glEnableVertexAttribArray(attribVertexNormal);
-	glEnableVertexAttribArray(attribVertexTexCoord);
-
-	glBindBuffer(GL_ARRAY_BUFFER, earthVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, earthIBO);
-
-	int stride = earth.getInterleavedStride();
-	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
-	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
-
-	matrixModelView = matrixView * EarthModel;
-	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
-	Matrix4 matrixNormal = matrixModelView;
-	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
-	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
-	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
-	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
-
-	glDrawElements(GL_TRIANGLES,
-		earth.getIndexCount(),
-		GL_UNSIGNED_INT,
-		(void*)0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glDisableVertexAttribArray(attribVertexPosition);
-	glDisableVertexAttribArray(attribVertexNormal);
-	glDisableVertexAttribArray(attribVertexTexCoord);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
-
-	glPopMatrix();
-}
-
-void CSolarSystemView::DrawMars() {
-
-	glGenBuffers(1, &marsVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, marsVBO);
-	glBufferData(GL_ARRAY_BUFFER, mars.getInterleavedVertexSize(), mars.getInterleavedVertices(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glGenBuffers(1, &marsIBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, marsIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, mars.getIndexSize(), mars.getIndices(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	// transform camera (view)
-	Matrix4 matrixView;
-	matrixView.translate(-posX, -posY, -posZ);
-	matrixView.rotateY(rotY);
-
-	// common model matrix
-	Matrix4 ModelMatrix;
-	ModelMatrix.rotateX(-90);
-	ModelMatrix.rotateZ(-25.19);
-
-	ModelMatrix.rotateY(marsRevolve);
-	ModelMatrix.translate(17.109 + 30.4, 0, 0);
-	ModelMatrix.rotateY(-marsRevolve);
-
-	ModelMatrix.rotateY(marsRot);
-
-	glPushMatrix();
-	// model matrix for each instance
-	Matrix4 MarsModel(ModelMatrix);    // right
-
-	glUseProgram(shaderProgram);
-	glBindTexture(GL_TEXTURE_2D, marsTex);
-
-	glEnableVertexAttribArray(attribVertexPosition);
-	glEnableVertexAttribArray(attribVertexNormal);
-	glEnableVertexAttribArray(attribVertexTexCoord);
-
-	glBindBuffer(GL_ARRAY_BUFFER, marsVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, marsIBO);
-
-	int stride = mars.getInterleavedStride();
-	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
-	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
-
-	matrixModelView = matrixView * MarsModel;
-	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
-	Matrix4 matrixNormal = matrixModelView;
-	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
-	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
-	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
-	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
-
-	glDrawElements(GL_TRIANGLES,
-		mars.getIndexCount(),
-		GL_UNSIGNED_INT,
-		(void*)0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glDisableVertexAttribArray(attribVertexPosition);
-	glDisableVertexAttribArray(attribVertexNormal);
-	glDisableVertexAttribArray(attribVertexTexCoord);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
-
-	glPopMatrix();
-}
-
-void CSolarSystemView::DrawJupiter() {
-
-	glGenBuffers(1, &jupiterVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, jupiterVBO);
-	glBufferData(GL_ARRAY_BUFFER, jupiter.getInterleavedVertexSize(), jupiter.getInterleavedVertices(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glGenBuffers(1, &jupiterIBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, jupiterIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, jupiter.getIndexSize(), jupiter.getIndices(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	// transform camera (view)
-	Matrix4 matrixView;
-	matrixView.translate(-posX, -posY, -posZ);
-	matrixView.rotateY(rotY);
-
-	// common model matrix
-	Matrix4 ModelMatrix;
-	ModelMatrix.rotateX(-90);
-	ModelMatrix.rotateZ(-3.12);
-
-	ModelMatrix.rotateY(jupiterRevolve);
-	ModelMatrix.translate(17.109 + 50, 0, 0);
-	ModelMatrix.rotateY(-jupiterRevolve);
-
-	ModelMatrix.rotateY(jupiterRot);
-
-	glPushMatrix();
-	// model matrix for each instance
-	Matrix4 EarthModel(ModelMatrix);    // right
-
-	glUseProgram(shaderProgram);
-	glBindTexture(GL_TEXTURE_2D, jupiterTex);
-
-	glEnableVertexAttribArray(attribVertexPosition);
-	glEnableVertexAttribArray(attribVertexNormal);
-	glEnableVertexAttribArray(attribVertexTexCoord);
-
-	glBindBuffer(GL_ARRAY_BUFFER, jupiterVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, jupiterIBO);
-
-	int stride = jupiter.getInterleavedStride();
-	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
-	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
-
-	matrixModelView = matrixView * EarthModel;
-	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
-	Matrix4 matrixNormal = matrixModelView;
-	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
-	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
-	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
-	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
-
-	glDrawElements(GL_TRIANGLES,
-		jupiter.getIndexCount(),
-		GL_UNSIGNED_INT,
-		(void*)0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glDisableVertexAttribArray(attribVertexPosition);
-	glDisableVertexAttribArray(attribVertexNormal);
-	glDisableVertexAttribArray(attribVertexTexCoord);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
-
-	glPopMatrix();
-}
-
-void CSolarSystemView::DrawSaturn() {
-
-	glGenBuffers(1, &saturnVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, saturnVBO);
-	glBufferData(GL_ARRAY_BUFFER, saturn.getInterleavedVertexSize(), saturn.getInterleavedVertices(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glGenBuffers(1, &saturnIBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, saturnIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, saturn.getIndexSize(), saturn.getIndices(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	// transform camera (view)
-	Matrix4 matrixView;
-	matrixView.translate(-posX, -posY, -posZ);
-	matrixView.rotateY(rotY);
-
-	// common model matrix
-	Matrix4 ModelMatrix;
-	ModelMatrix.rotateX(-90);
-	ModelMatrix.rotateZ(-26.73);
-
-	ModelMatrix.rotateY(saturnRevolve);
-	ModelMatrix.translate(17.109 + 65, 0, 0);
-	ModelMatrix.rotateY(-saturnRevolve);
-
-	ModelMatrix.rotateY(saturnRot);
-
-	glPushMatrix();
-	// model matrix for each instance
-	Matrix4 SaturnModel(ModelMatrix);    // right
-
-	glUseProgram(shaderProgram);
-	glBindTexture(GL_TEXTURE_2D, saturnTex);
-
-	glEnableVertexAttribArray(attribVertexPosition);
-	glEnableVertexAttribArray(attribVertexNormal);
-	glEnableVertexAttribArray(attribVertexTexCoord);
-
-	glBindBuffer(GL_ARRAY_BUFFER, saturnVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, saturnIBO);
-
-	int stride = saturn.getInterleavedStride();
-	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
-	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
-
-	matrixModelView = matrixView * SaturnModel;
-	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
-	Matrix4 matrixNormal = matrixModelView;
-	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
-	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
-	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
-	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
-
-	glDrawElements(GL_TRIANGLES,
-		saturn.getIndexCount(),
-		GL_UNSIGNED_INT,
-		(void*)0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glDisableVertexAttribArray(attribVertexPosition);
-	glDisableVertexAttribArray(attribVertexNormal);
-	glDisableVertexAttribArray(attribVertexTexCoord);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
-
-	glPopMatrix();
-}
-
-void CSolarSystemView::DrawUranus() {
-
-	glGenBuffers(1, &uranusVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, uranusVBO);
-	glBufferData(GL_ARRAY_BUFFER, uranus.getInterleavedVertexSize(), uranus.getInterleavedVertices(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glGenBuffers(1, &uranusIBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, uranusIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, uranus.getIndexSize(), uranus.getIndices(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	// transform camera (view)
-	Matrix4 matrixView;
-	matrixView.translate(-posX, -posY, -posZ);
-	matrixView.rotateY(rotY);
-
-	// common model matrix
-	Matrix4 ModelMatrix;
-	ModelMatrix.rotateX(-90);
-	ModelMatrix.rotateZ(-23.44);
-
-	ModelMatrix.rotateY(uranusRevolve);
-	ModelMatrix.translate(17.109 + 75, 0, 0);
-	ModelMatrix.rotateY(-uranusRevolve);
-
-	ModelMatrix.rotateY(uranusRot);
-
-	glPushMatrix();
-	// model matrix for each instance
-	Matrix4 UranusModel(ModelMatrix);    // right
-
-	glUseProgram(shaderProgram);
-	glBindTexture(GL_TEXTURE_2D, uranusTex);
-
-	glEnableVertexAttribArray(attribVertexPosition);
-	glEnableVertexAttribArray(attribVertexNormal);
-	glEnableVertexAttribArray(attribVertexTexCoord);
-
-	glBindBuffer(GL_ARRAY_BUFFER, uranusVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, uranusIBO);
-
-	int stride = uranus.getInterleavedStride();
-	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
-	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
-
-	matrixModelView = matrixView * UranusModel;
-	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
-	Matrix4 matrixNormal = matrixModelView;
-	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
-	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
-	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
-	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
-
-	glDrawElements(GL_TRIANGLES,
-		uranus.getIndexCount(),
-		GL_UNSIGNED_INT,
-		(void*)0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glDisableVertexAttribArray(attribVertexPosition);
-	glDisableVertexAttribArray(attribVertexNormal);
-	glDisableVertexAttribArray(attribVertexTexCoord);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
-
-	glPopMatrix();
-}
-
-void CSolarSystemView::DrawNeptune() {
-
-	glGenBuffers(1, &neptuneVBO);
-	glBindBuffer(GL_ARRAY_BUFFER, neptuneVBO);
-	glBufferData(GL_ARRAY_BUFFER, neptune.getInterleavedVertexSize(), neptune.getInterleavedVertices(), GL_STATIC_DRAW);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glGenBuffers(1, &neptuneIBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, neptuneIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, neptune.getIndexSize(), neptune.getIndices(), GL_STATIC_DRAW);
-
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-	// transform camera (view)
-	Matrix4 matrixView;
-	matrixView.translate(-posX, -posY, -posZ);
-	matrixView.rotateY(rotY);
-
-	// common model matrix
-	Matrix4 ModelMatrix;
-	ModelMatrix.rotateX(-90);
-	ModelMatrix.rotateZ(-28.33);
-
-	ModelMatrix.rotateY(neptuneRevolve);
-	ModelMatrix.translate(17.109 + 85, 0, 0);
-	ModelMatrix.rotateY(-neptuneRevolve);
-
-	ModelMatrix.rotateY(neptuneRot);
-
-	glPushMatrix();
-	// model matrix for each instance
-	Matrix4 NeptuneModel(ModelMatrix);    // right
-
-	glUseProgram(shaderProgram);
-	glBindTexture(GL_TEXTURE_2D, neptuneTex);
-
-	glEnableVertexAttribArray(attribVertexPosition);
-	glEnableVertexAttribArray(attribVertexNormal);
-	glEnableVertexAttribArray(attribVertexTexCoord);
-
-	glBindBuffer(GL_ARRAY_BUFFER, neptuneVBO);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, neptuneIBO);
-
-	int stride = neptune.getInterleavedStride();
-	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
-	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
-	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
-
-	matrixModelView = matrixView * NeptuneModel;
-	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
-	Matrix4 matrixNormal = matrixModelView;
-	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
-	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
-	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
-	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
-
-	glDrawElements(GL_TRIANGLES,
-		neptune.getIndexCount(),
-		GL_UNSIGNED_INT,
-		(void*)0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-	glDisableVertexAttribArray(attribVertexPosition);
-	glDisableVertexAttribArray(attribVertexNormal);
-	glDisableVertexAttribArray(attribVertexTexCoord);
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glUseProgram(0);
-
-	glPopMatrix();
-}
+//void CSolarSystemView::DrawSun() {
+//	glGenBuffers(1, &sunVBO);
+//	glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
+//	glBufferData(GL_ARRAY_BUFFER, sun.getInterleavedVertexSize(), sun.getInterleavedVertices(), GL_STATIC_DRAW);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glGenBuffers(1, &sunIBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sunIBO);
+//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sun.getIndexSize(), sun.getIndices(), GL_STATIC_DRAW);
+//
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//
+//	// transform camera (view)
+//	Matrix4 matrixView;
+//	matrixView.translate(-posX, -posY, -posZ);
+//	matrixView.rotateY(rotY);
+//
+//	// common model matrix
+//	Matrix4 ModelMatrix;
+//	ModelMatrix.rotateX(-90);
+//	ModelMatrix.rotateY(sunRot);
+//	ModelMatrix.rotateZ(7.25);
+//
+//	glPushMatrix();
+//	// model matrix for each instance
+//	Matrix4 SunModel(ModelMatrix);    // right
+//
+//	glUseProgram(shaderProgram);
+//	glBindTexture(GL_TEXTURE_2D, sunTex);
+//
+//	glEnableVertexAttribArray(attribVertexPosition);
+//	glEnableVertexAttribArray(attribVertexNormal);
+//	glEnableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindBuffer(GL_ARRAY_BUFFER, sunVBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, sunIBO);
+//
+//	int stride = sun.getInterleavedStride();
+//	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+//	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+//	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+//
+//	matrixModelView = matrixView * SunModel;
+//	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+//	Matrix4 matrixNormal = matrixModelView;
+//	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+//	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+//	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+//	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+//
+//	glDrawElements(GL_TRIANGLES,
+//		sun.getIndexCount(),
+//		GL_UNSIGNED_INT,
+//		(void*)0);
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//
+//	glDisableVertexAttribArray(attribVertexPosition);
+//	glDisableVertexAttribArray(attribVertexNormal);
+//	glDisableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//	glUseProgram(0);
+//
+//	glPopMatrix();
+//}
+//
+//void CSolarSystemView::DrawMercury() {
+//	glGenBuffers(1, &mercuryVBO);
+//	glBindBuffer(GL_ARRAY_BUFFER, mercuryVBO);
+//	glBufferData(GL_ARRAY_BUFFER, mercury.getInterleavedVertexSize(), mercury.getInterleavedVertices(), GL_STATIC_DRAW);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glGenBuffers(1, &mercuryIBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mercuryIBO);
+//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, mercury.getIndexSize(), mercury.getIndices(), GL_STATIC_DRAW);
+//
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//
+//	// transform camera (view)
+//	Matrix4 matrixView;
+//	matrixView.translate(-posX, -posY, -posZ);
+//	matrixView.rotateY(rotY);
+//
+//	// common model matrix
+//	Matrix4 ModelMatrix;
+//	ModelMatrix.rotateX(-90);
+//	ModelMatrix.rotateZ(0.01); // 자전 기울기
+//
+//	ModelMatrix.rotateY(mercuryRevolve);
+//	ModelMatrix.translate(17.109 + 7.8, 0, 0);
+//	ModelMatrix.rotateY(-mercuryRevolve);
+//
+//	ModelMatrix.rotateY(mercuryRot);
+//
+//	glPushMatrix();
+//	// model matrix for each instance
+//	Matrix4 MercuryModel(ModelMatrix);
+//
+//	glUseProgram(shaderProgram);
+//	glBindTexture(GL_TEXTURE_2D, mercuryTex);
+//
+//	glEnableVertexAttribArray(attribVertexPosition);
+//	glEnableVertexAttribArray(attribVertexNormal);
+//	glEnableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindBuffer(GL_ARRAY_BUFFER, mercuryVBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mercuryIBO);
+//
+//	int stride = mercury.getInterleavedStride();
+//	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+//	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+//	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+//
+//	matrixModelView = matrixView * MercuryModel;
+//	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+//	Matrix4 matrixNormal = matrixModelView;
+//	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+//	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+//	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+//	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+//
+//	glDrawElements(GL_TRIANGLES,
+//		mercury.getIndexCount(),
+//		GL_UNSIGNED_INT,
+//		(void*)0);
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//
+//	glDisableVertexAttribArray(attribVertexPosition);
+//	glDisableVertexAttribArray(attribVertexNormal);
+//	glDisableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//	glUseProgram(0);
+//
+//	glPopMatrix();
+//}
+//
+//void CSolarSystemView::DrawVenus() {
+//
+//	glGenBuffers(1, &venusVBO);
+//	glBindBuffer(GL_ARRAY_BUFFER, venusVBO);
+//	glBufferData(GL_ARRAY_BUFFER, venus.getInterleavedVertexSize(), venus.getInterleavedVertices(), GL_STATIC_DRAW);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glGenBuffers(1, &venusIBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, venusIBO);
+//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, venus.getIndexSize(), venus.getIndices(), GL_STATIC_DRAW);
+//
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//
+//	// transform camera (view)
+//	Matrix4 matrixView;
+//	matrixView.translate(-posX, -posY, -posZ);
+//	matrixView.rotateY(rotY);
+//
+//	// common model matrix
+//	Matrix4 ModelMatrix;
+//	ModelMatrix.rotateX(-90);
+//	ModelMatrix.rotateZ(-2.64);
+//
+//	ModelMatrix.rotateY(venusRevolve);
+//	ModelMatrix.translate(17.109 + 14, 0, 0);
+//	ModelMatrix.rotateY(-venusRevolve);
+//
+//	ModelMatrix.rotateY(venusRot);
+//
+//	glPushMatrix();
+//	// model matrix for each instance
+//	Matrix4 VenusModel(ModelMatrix);    // right
+//
+//	glUseProgram(shaderProgram);
+//	glBindTexture(GL_TEXTURE_2D, venusTex);
+//
+//	glEnableVertexAttribArray(attribVertexPosition);
+//	glEnableVertexAttribArray(attribVertexNormal);
+//	glEnableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindBuffer(GL_ARRAY_BUFFER, venusVBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, venusIBO);
+//
+//	int stride = venus.getInterleavedStride();
+//	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+//	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+//	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+//
+//	matrixModelView = matrixView * VenusModel;
+//	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+//	Matrix4 matrixNormal = matrixModelView;
+//	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+//	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+//	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+//	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+//
+//	glDrawElements(GL_TRIANGLES,
+//		venus.getIndexCount(),
+//		GL_UNSIGNED_INT,
+//		(void*)0);
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//
+//	glDisableVertexAttribArray(attribVertexPosition);
+//	glDisableVertexAttribArray(attribVertexNormal);
+//	glDisableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//	glUseProgram(0);
+//
+//	glPopMatrix();
+//}
+//
+//void CSolarSystemView::DrawEarth() {
+//
+//	glGenBuffers(1, &earthVBO);
+//	glBindBuffer(GL_ARRAY_BUFFER, earthVBO);
+//	glBufferData(GL_ARRAY_BUFFER, earth.getInterleavedVertexSize(), earth.getInterleavedVertices(), GL_STATIC_DRAW);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glGenBuffers(1, &earthIBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, earthIBO);
+//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, earth.getIndexSize(), earth.getIndices(), GL_STATIC_DRAW);
+//
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//
+//	// transform camera (view)
+//	Matrix4 matrixView;
+//	matrixView.translate(-posX, -posY, -posZ);
+//	matrixView.rotateY(rotY);
+//
+//	// common model matrix
+//	Matrix4 ModelMatrix;
+//	ModelMatrix.rotateX(-90);
+//	ModelMatrix.rotateZ(-23.44);
+//
+//	ModelMatrix.rotateY(earthRevolve);
+//	ModelMatrix.translate(17.109 + 20, 0, 0); // 궤도 장반경
+//	ModelMatrix.rotateY(-earthRevolve);
+//
+//	ModelMatrix.rotateY(earthRot);   // 자전 속도
+//
+//	glPushMatrix();
+//	// model matrix for each instance
+//	Matrix4 EarthModel(ModelMatrix);
+//
+//	glUseProgram(shaderProgram);
+//	glBindTexture(GL_TEXTURE_2D, earthTex);
+//
+//	glEnableVertexAttribArray(attribVertexPosition);
+//	glEnableVertexAttribArray(attribVertexNormal);
+//	glEnableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindBuffer(GL_ARRAY_BUFFER, earthVBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, earthIBO);
+//
+//	int stride = earth.getInterleavedStride();
+//	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+//	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+//	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+//
+//	matrixModelView = matrixView * EarthModel;
+//	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+//	Matrix4 matrixNormal = matrixModelView;
+//	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+//	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+//	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+//	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+//
+//	glDrawElements(GL_TRIANGLES,
+//		earth.getIndexCount(),
+//		GL_UNSIGNED_INT,
+//		(void*)0);
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//
+//	glDisableVertexAttribArray(attribVertexPosition);
+//	glDisableVertexAttribArray(attribVertexNormal);
+//	glDisableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//	glUseProgram(0);
+//
+//	glPopMatrix();
+//}
+//
+//void CSolarSystemView::DrawMars() {
+//
+//	glGenBuffers(1, &marsVBO);
+//	glBindBuffer(GL_ARRAY_BUFFER, marsVBO);
+//	glBufferData(GL_ARRAY_BUFFER, mars.getInterleavedVertexSize(), mars.getInterleavedVertices(), GL_STATIC_DRAW);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glGenBuffers(1, &marsIBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, marsIBO);
+//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, mars.getIndexSize(), mars.getIndices(), GL_STATIC_DRAW);
+//
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//
+//	// transform camera (view)
+//	Matrix4 matrixView;
+//	matrixView.translate(-posX, -posY, -posZ);
+//	matrixView.rotateY(rotY);
+//
+//	// common model matrix
+//	Matrix4 ModelMatrix;
+//	ModelMatrix.rotateX(-90);
+//	ModelMatrix.rotateZ(-25.19);
+//
+//	ModelMatrix.rotateY(marsRevolve);
+//	ModelMatrix.translate(17.109 + 30.4, 0, 0);
+//	ModelMatrix.rotateY(-marsRevolve);
+//
+//	ModelMatrix.rotateY(marsRot);
+//
+//	glPushMatrix();
+//	// model matrix for each instance
+//	Matrix4 MarsModel(ModelMatrix);    // right
+//
+//	glUseProgram(shaderProgram);
+//	glBindTexture(GL_TEXTURE_2D, marsTex);
+//
+//	glEnableVertexAttribArray(attribVertexPosition);
+//	glEnableVertexAttribArray(attribVertexNormal);
+//	glEnableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindBuffer(GL_ARRAY_BUFFER, marsVBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, marsIBO);
+//
+//	int stride = mars.getInterleavedStride();
+//	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+//	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+//	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+//
+//	matrixModelView = matrixView * MarsModel;
+//	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+//	Matrix4 matrixNormal = matrixModelView;
+//	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+//	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+//	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+//	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+//
+//	glDrawElements(GL_TRIANGLES,
+//		mars.getIndexCount(),
+//		GL_UNSIGNED_INT,
+//		(void*)0);
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//
+//	glDisableVertexAttribArray(attribVertexPosition);
+//	glDisableVertexAttribArray(attribVertexNormal);
+//	glDisableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//	glUseProgram(0);
+//
+//	glPopMatrix();
+//}
+//
+//void CSolarSystemView::DrawJupiter() {
+//
+//	glGenBuffers(1, &jupiterVBO);
+//	glBindBuffer(GL_ARRAY_BUFFER, jupiterVBO);
+//	glBufferData(GL_ARRAY_BUFFER, jupiter.getInterleavedVertexSize(), jupiter.getInterleavedVertices(), GL_STATIC_DRAW);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glGenBuffers(1, &jupiterIBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, jupiterIBO);
+//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, jupiter.getIndexSize(), jupiter.getIndices(), GL_STATIC_DRAW);
+//
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//
+//	// transform camera (view)
+//	Matrix4 matrixView;
+//	matrixView.translate(-posX, -posY, -posZ);
+//	matrixView.rotateY(rotY);
+//
+//	// common model matrix
+//	Matrix4 ModelMatrix;
+//	ModelMatrix.rotateX(-90);
+//	ModelMatrix.rotateZ(-3.12);
+//
+//	ModelMatrix.rotateY(jupiterRevolve);
+//	ModelMatrix.translate(17.109 + 50, 0, 0);
+//	ModelMatrix.rotateY(-jupiterRevolve);
+//
+//	ModelMatrix.rotateY(jupiterRot);
+//
+//	glPushMatrix();
+//	// model matrix for each instance
+//	Matrix4 EarthModel(ModelMatrix);    // right
+//
+//	glUseProgram(shaderProgram);
+//	glBindTexture(GL_TEXTURE_2D, jupiterTex);
+//
+//	glEnableVertexAttribArray(attribVertexPosition);
+//	glEnableVertexAttribArray(attribVertexNormal);
+//	glEnableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindBuffer(GL_ARRAY_BUFFER, jupiterVBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, jupiterIBO);
+//
+//	int stride = jupiter.getInterleavedStride();
+//	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+//	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+//	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+//
+//	matrixModelView = matrixView * EarthModel;
+//	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+//	Matrix4 matrixNormal = matrixModelView;
+//	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+//	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+//	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+//	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+//
+//	glDrawElements(GL_TRIANGLES,
+//		jupiter.getIndexCount(),
+//		GL_UNSIGNED_INT,
+//		(void*)0);
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//
+//	glDisableVertexAttribArray(attribVertexPosition);
+//	glDisableVertexAttribArray(attribVertexNormal);
+//	glDisableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//	glUseProgram(0);
+//
+//	glPopMatrix();
+//}
+//
+//void CSolarSystemView::DrawSaturn() {
+//
+//	glGenBuffers(1, &saturnVBO);
+//	glBindBuffer(GL_ARRAY_BUFFER, saturnVBO);
+//	glBufferData(GL_ARRAY_BUFFER, saturn.getInterleavedVertexSize(), saturn.getInterleavedVertices(), GL_STATIC_DRAW);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glGenBuffers(1, &saturnIBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, saturnIBO);
+//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, saturn.getIndexSize(), saturn.getIndices(), GL_STATIC_DRAW);
+//
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//
+//	// transform camera (view)
+//	Matrix4 matrixView;
+//	matrixView.translate(-posX, -posY, -posZ);
+//	matrixView.rotateY(rotY);
+//
+//	// common model matrix
+//	Matrix4 ModelMatrix;
+//	ModelMatrix.rotateX(-90);
+//	ModelMatrix.rotateZ(-26.73);
+//
+//	ModelMatrix.rotateY(saturnRevolve);
+//	ModelMatrix.translate(17.109 + 65, 0, 0);
+//	ModelMatrix.rotateY(-saturnRevolve);
+//
+//	ModelMatrix.rotateY(saturnRot);
+//
+//	glPushMatrix();
+//	// model matrix for each instance
+//	Matrix4 SaturnModel(ModelMatrix);    // right
+//
+//	glUseProgram(shaderProgram);
+//	glBindTexture(GL_TEXTURE_2D, saturnTex);
+//
+//	glEnableVertexAttribArray(attribVertexPosition);
+//	glEnableVertexAttribArray(attribVertexNormal);
+//	glEnableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindBuffer(GL_ARRAY_BUFFER, saturnVBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, saturnIBO);
+//
+//	int stride = saturn.getInterleavedStride();
+//	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+//	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+//	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+//
+//	matrixModelView = matrixView * SaturnModel;
+//	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+//	Matrix4 matrixNormal = matrixModelView;
+//	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+//	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+//	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+//	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+//
+//	glDrawElements(GL_TRIANGLES,
+//		saturn.getIndexCount(),
+//		GL_UNSIGNED_INT,
+//		(void*)0);
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//
+//	glDisableVertexAttribArray(attribVertexPosition);
+//	glDisableVertexAttribArray(attribVertexNormal);
+//	glDisableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//	glUseProgram(0);
+//
+//	glPopMatrix();
+//}
+//
+//void CSolarSystemView::DrawUranus() {
+//
+//	glGenBuffers(1, &uranusVBO);
+//	glBindBuffer(GL_ARRAY_BUFFER, uranusVBO);
+//	glBufferData(GL_ARRAY_BUFFER, uranus.getInterleavedVertexSize(), uranus.getInterleavedVertices(), GL_STATIC_DRAW);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glGenBuffers(1, &uranusIBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, uranusIBO);
+//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, uranus.getIndexSize(), uranus.getIndices(), GL_STATIC_DRAW);
+//
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//
+//	// transform camera (view)
+//	Matrix4 matrixView;
+//	matrixView.translate(-posX, -posY, -posZ);
+//	matrixView.rotateY(rotY);
+//
+//	// common model matrix
+//	Matrix4 ModelMatrix;
+//	ModelMatrix.rotateX(-90);
+//	ModelMatrix.rotateZ(-23.44);
+//
+//	ModelMatrix.rotateY(uranusRevolve);
+//	ModelMatrix.translate(17.109 + 75, 0, 0);
+//	ModelMatrix.rotateY(-uranusRevolve);
+//
+//	ModelMatrix.rotateY(uranusRot);
+//
+//	glPushMatrix();
+//	// model matrix for each instance
+//	Matrix4 UranusModel(ModelMatrix);    // right
+//
+//	glUseProgram(shaderProgram);
+//	glBindTexture(GL_TEXTURE_2D, uranusTex);
+//
+//	glEnableVertexAttribArray(attribVertexPosition);
+//	glEnableVertexAttribArray(attribVertexNormal);
+//	glEnableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindBuffer(GL_ARRAY_BUFFER, uranusVBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, uranusIBO);
+//
+//	int stride = uranus.getInterleavedStride();
+//	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+//	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+//	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+//
+//	matrixModelView = matrixView * UranusModel;
+//	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+//	Matrix4 matrixNormal = matrixModelView;
+//	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+//	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+//	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+//	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+//
+//	glDrawElements(GL_TRIANGLES,
+//		uranus.getIndexCount(),
+//		GL_UNSIGNED_INT,
+//		(void*)0);
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//
+//	glDisableVertexAttribArray(attribVertexPosition);
+//	glDisableVertexAttribArray(attribVertexNormal);
+//	glDisableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//	glUseProgram(0);
+//
+//	glPopMatrix();
+//}
+//
+//void CSolarSystemView::DrawNeptune() {
+//
+//	glGenBuffers(1, &neptuneVBO);
+//	glBindBuffer(GL_ARRAY_BUFFER, neptuneVBO);
+//	glBufferData(GL_ARRAY_BUFFER, neptune.getInterleavedVertexSize(), neptune.getInterleavedVertices(), GL_STATIC_DRAW);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glGenBuffers(1, &neptuneIBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, neptuneIBO);
+//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, neptune.getIndexSize(), neptune.getIndices(), GL_STATIC_DRAW);
+//
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//
+//	// transform camera (view)
+//	Matrix4 matrixView;
+//	matrixView.translate(-posX, -posY, -posZ);
+//	matrixView.rotateY(rotY);
+//
+//	// common model matrix
+//	Matrix4 ModelMatrix;
+//	ModelMatrix.rotateX(-90);
+//	ModelMatrix.rotateZ(-28.33);
+//
+//	ModelMatrix.rotateY(neptuneRevolve);
+//	ModelMatrix.translate(17.109 + 85, 0, 0);
+//	ModelMatrix.rotateY(-neptuneRevolve);
+//
+//	ModelMatrix.rotateY(neptuneRot);
+//
+//	glPushMatrix();
+//	// model matrix for each instance
+//	Matrix4 NeptuneModel(ModelMatrix);    // right
+//
+//	glUseProgram(shaderProgram);
+//	glBindTexture(GL_TEXTURE_2D, neptuneTex);
+//
+//	glEnableVertexAttribArray(attribVertexPosition);
+//	glEnableVertexAttribArray(attribVertexNormal);
+//	glEnableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindBuffer(GL_ARRAY_BUFFER, neptuneVBO);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, neptuneIBO);
+//
+//	int stride = neptune.getInterleavedStride();
+//	glVertexAttribPointer(attribVertexPosition, 3, GL_FLOAT, false, stride, 0);
+//	glVertexAttribPointer(attribVertexNormal, 3, GL_FLOAT, false, stride, (void*)(3 * sizeof(float)));
+//	glVertexAttribPointer(attribVertexTexCoord, 2, GL_FLOAT, false, stride, (void*)(6 * sizeof(float)));
+//
+//	matrixModelView = matrixView * NeptuneModel;
+//	Matrix4 matrixModelViewProjection = matrixProjection * matrixModelView;
+//	Matrix4 matrixNormal = matrixModelView;
+//	matrixNormal.setColumn(3, Vector4(0, 0, 0, 1));
+//	glUniformMatrix4fv(uniformMatrixModelView, 1, false, matrixModelView.get());
+//	glUniformMatrix4fv(uniformMatrixModelViewProjection, 1, false, matrixModelViewProjection.get());
+//	glUniformMatrix4fv(uniformMatrixNormal, 1, false, matrixNormal.get());
+//
+//	glDrawElements(GL_TRIANGLES,
+//		neptune.getIndexCount(),
+//		GL_UNSIGNED_INT,
+//		(void*)0);
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//
+//	glDisableVertexAttribArray(attribVertexPosition);
+//	glDisableVertexAttribArray(attribVertexNormal);
+//	glDisableVertexAttribArray(attribVertexTexCoord);
+//
+//	glBindTexture(GL_TEXTURE_2D, 0);
+//	glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+//	glUseProgram(0);
+//
+//	glPopMatrix();
+//}
 
 void CSolarSystemView::Display() {
-	DrawSun();
-	DrawMercury();
-	DrawVenus();
-	DrawEarth();
-	DrawMars();
-	DrawJupiter();
-	DrawSaturn();
-	DrawUranus();
-	DrawNeptune();
+	glPushMatrix();
+	glTranslatef(0, 0, -cameraDistance);
+
+	glPushMatrix();
+	glRotatef(cameraAngleX, 1, 0, 0);
+	glRotatef(cameraAngleY, 0, 1, 0);
+	glRotatef(-90, 1, 0, 0);
+	glTranslatef(15.0f, 0.0f, 0.0f);
+	glTranslatef(-1.0f, 0.0f, 0.0f);
+	glRotatef(earthRot, 0, 0, 1);
+	glTranslatef(1.0f, 0.0f, 0.0f);
+	glBindTexture(GL_TEXTURE_2D, earthTex);
+	earth.draw(lineColor);
+	glPopMatrix();
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glPopMatrix();
+
 }

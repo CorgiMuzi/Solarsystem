@@ -329,12 +329,9 @@ std::vector<float> Sphere::computeFaceNormal(float x1, float y1, float z1,
 	return normal;
 }
 
-
-
-void Sphere::draw(const float lineColor[4]) const {
-	glColor4fv(lineColor);
-	glMaterialfv(GL_FRONT, GL_DIFFUSE, lineColor);
-
+void Sphere::draw(const float lineColor[4]) const
+{
+	// interleaved array
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_NORMAL_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -342,36 +339,51 @@ void Sphere::draw(const float lineColor[4]) const {
 	glNormalPointer(GL_FLOAT, interleavedStride, &interleavedVertices[3]);
 	glTexCoordPointer(2, GL_FLOAT, interleavedStride, &interleavedVertices[6]);
 
-	glDrawElements(GL_LINE_STRIP, (unsigned int)indices.size(), GL_UNSIGNED_INT, indices.data());
+	glDrawElements(GL_TRIANGLES, (unsigned int)indices.size(), GL_UNSIGNED_INT, indices.data());
 
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_NORMAL_ARRAY);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 }
 
+
+
+///////////////////////////////////////////////////////////////////////////////
+// draw lines only
+// the caller must set the line width before call this
+///////////////////////////////////////////////////////////////////////////////
 void Sphere::drawLines(const float lineColor[4]) const
 {
+	// set line colour
 	glColor4fv(lineColor);
 	glMaterialfv(GL_FRONT, GL_DIFFUSE, lineColor);
 
+	// draw lines with VA
 	glDisable(GL_LIGHTING);
 	glDisable(GL_TEXTURE_2D);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(3, GL_FLOAT, 0, vertices.data());
 
-	glDrawElements(GL_LINE_STRIP, (unsigned int)lineIndices.size(), GL_UNSIGNED_INT, lineIndices.data());
+	glDrawElements(GL_LINES, (unsigned int)lineIndices.size(), GL_UNSIGNED_INT, lineIndices.data());
 
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glEnable(GL_LIGHTING);
 	glEnable(GL_TEXTURE_2D);
 }
 
+
+
+///////////////////////////////////////////////////////////////////////////////
+// draw a sphere surfaces and lines on top of it
+// the caller must set the line width before call this
+///////////////////////////////////////////////////////////////////////////////
 void Sphere::drawWithLines(const float lineColor[4]) const
 {
 	glEnable(GL_POLYGON_OFFSET_FILL);
-	glPolygonOffset(1.0, 1.0f);
+	glPolygonOffset(1.0, 1.0f); // move polygon backward
 	this->draw(lineColor);
 	glDisable(GL_POLYGON_OFFSET_FILL);
 
+	// draw lines with VA
 	drawLines(lineColor);
 }

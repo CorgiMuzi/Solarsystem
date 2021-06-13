@@ -27,7 +27,7 @@ public:
 	bool InitGLSL();
 	void InitLights();
 
-	void ClearBufferMem();
+	void InitMembers();
 	
 	void GetTextures();
 	void ReSizeGLScene(GLsizei width, GLsizei height);
@@ -35,6 +35,7 @@ public:
 	void ToOrtho(GLsizei width, GLsizei height);
 	void ToPerspective(GLsizei width, GLsizei height);
 	void Display();
+	void SetCamera();
 
 	void DrawSun();
 	void DrawMercury();
