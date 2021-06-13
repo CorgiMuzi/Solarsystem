@@ -48,6 +48,7 @@ public:
 	void DrawNeptune();
 
 	GLuint LoadTexture(const char* fileName, bool wrap = true);
+	void CreateShadow();
 
 private : 
 	GLfloat rotX , rotY, rotZ;

@@ -17,67 +17,67 @@
 #define new DEBUG_NEW
 #endif
 
-#pragma region Shader_Source
-const char* vertexShaderSource = R"(
-#version 110
-uniform mat4 matrixModelView;
-uniform mat4 matrixNormal;
-uniform mat4 matrixModelViewProjection;
-attribute vec3 vertexPosition;
-attribute vec3 vertexNormal;
-attribute vec2 vertexTexCoord;
-varying vec3 esVertex, esNormal;
-varying vec2 texCoord0;
-void main()
-{
-    esVertex = vec3(matrixModelView * vec4(vertexPosition, 1.0));
-    esNormal = vec3(matrixNormal * vec4(vertexNormal, 1.0));
-    texCoord0 = vertexTexCoord;
-    gl_Position = matrixModelViewProjection * vec4(vertexPosition, 1.0);
-}
-)";
-
-const char* fragmentShaderSource = R"(
-#version 110
-uniform vec4 lightPosition;             
-uniform vec4 lightAmbient;              
-uniform vec4 lightDiffuse;              
-uniform vec4 lightSpecular;             
-uniform vec4 materialAmbient;           
-uniform vec4 materialDiffuse;           
-uniform vec4 materialSpecular;          
-uniform float materialShininess;        
-uniform sampler2D map0;                 
-uniform bool textureUsed;               
-varying vec3 esVertex, esNormal;
-varying vec2 texCoord0;
-void main()
-{
-    vec3 normal = normalize(esNormal);
-    vec3 light;
-    if(lightPosition.w == 0.0)
-    {
-        light = normalize(lightPosition.xyz);
-    }
-    else
-    {
-        light = normalize(lightPosition.xyz - esVertex);
-    }
-    vec3 view = normalize(-esVertex);
-    vec3 halfv = normalize(light + view);
-
-    vec3 color = lightAmbient.rgb * materialAmbient.rgb;       
-    float dotNL = max(dot(normal, light), 0.0);
-    color += lightDiffuse.rgb * materialDiffuse.rgb * dotNL;    
-    if(textureUsed)
-        color *= texture2D(map0, texCoord0).rgb;               
-    float dotNH = max(dot(normal, halfv), 0.0);
-    color += pow(dotNH, materialShininess) * lightSpecular.rgb * materialSpecular.rgb; 
-    gl_FragColor = vec4(color, materialDiffuse.a);
-}
-)";
-
-#pragma endregion
+//#pragma region Shader_Source
+//const char* vertexShaderSource = R"(
+//#version 110
+//uniform mat4 matrixModelView;
+//uniform mat4 matrixNormal;
+//uniform mat4 matrixModelViewProjection;
+//attribute vec3 vertexPosition;
+//attribute vec3 vertexNormal;
+//attribute vec2 vertexTexCoord;
+//varying vec3 esVertex, esNormal;
+//varying vec2 texCoord0;
+//void main()
+//{
+//    esVertex = vec3(matrixModelView * vec4(vertexPosition, 1.0));
+//    esNormal = vec3(matrixNormal * vec4(vertexNormal, 1.0));
+//    texCoord0 = vertexTexCoord;
+//    gl_Position = matrixModelViewProjection * vec4(vertexPosition, 1.0);
+//}
+//)";
+//
+//const char* fragmentShaderSource = R"(
+//#version 110
+//uniform vec4 lightPosition;             
+//uniform vec4 lightAmbient;              
+//uniform vec4 lightDiffuse;              
+//uniform vec4 lightSpecular;             
+//uniform vec4 materialAmbient;           
+//uniform vec4 materialDiffuse;           
+//uniform vec4 materialSpecular;          
+//uniform float materialShininess;        
+//uniform sampler2D map0;                 
+//uniform bool textureUsed;               
+//varying vec3 esVertex, esNormal;
+//varying vec2 texCoord0;
+//void main()
+//{
+//    vec3 normal = normalize(esNormal);
+//    vec3 light;
+//    if(lightPosition.w == 0.0)
+//    {
+//        light = normalize(lightPosition.xyz);
+//    }
+//    else
+//    {
+//        light = normalize(lightPosition.xyz - esVertex);
+//    }
+//    vec3 view = normalize(-esVertex);
+//    vec3 halfv = normalize(light + view);
+//
+//    vec3 color = lightAmbient.rgb * materialAmbient.rgb;       
+//    float dotNL = max(dot(normal, light), 0.0);
+//    color += lightDiffuse.rgb * materialDiffuse.rgb * dotNL;    
+//    if(textureUsed)
+//        color *= texture2D(map0, texCoord0).rgb;               
+//    float dotNH = max(dot(normal, halfv), 0.0);
+//    color += pow(dotNH, materialShininess) * lightSpecular.rgb * materialSpecular.rgb; 
+//    gl_FragColor = vec4(color, materialDiffuse.a);
+//}
+//)";
+//
+//#pragma endregion
 
 #pragma region Property_for_Shader
 GLuint shaderProgram = 0;
@@ -104,21 +104,27 @@ GLint attribVertexTexCoord;
 GLuint sunVBO = 0, mercuryVBO = 0, venusVBO = 0, earthVBO = 0, marsVBO = 0, jupiterVBO = 0, saturnVBO = 0, uranusVBO = 0, neptuneVBO = 0;
 GLuint sunIBO = 0, mercuryIBO = 0, venusIBO = 0, earthIBO = 0, marsIBO = 0, jupiterIBO = 0, saturnIBO = 0, uranusIBO = 0, neptuneIBO = 0;
 
-GLuint sunTex, mercuryTex, venusTex, earthTex, marsTex, jupiterTex, saturnTex, uranusTex, neptuneTex;
+GLuint sunTex, mercuryTex, venusTex, earthTex, moonTex, marsTex, jupiterTex, saturnTex, uranusTex, neptuneTex;
 
 Matrix4 matrixModelView;
 Matrix4 matrixProjection;
 
 int screenWidth;
 int screenHeight;
-float mouseX, mouseY;
+float cameraX, cameraY;
 float cameraAngleX;
 float cameraAngleY;
 float cameraDistance;
+float timeSpeed;
+bool isTimeGoing;
+float matAmbient[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+float matDiff[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+float matSpecular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 const int   SCREEN_WIDTH = 1500;
 const int   SCREEN_HEIGHT = 500;
-const float CAMERA_DISTANCE = 20.0f;
+const float CAMERA_DISTANCE = 100.0f;
+const float DEFAULT_TIME_SPEED = 1.0f;
 #pragma endregion
 
 #pragma region Sphere_Properties
@@ -127,6 +133,7 @@ Sphere sun(17.109f, 36, 18);
 Sphere mercury(0.6f, 36, 18);
 Sphere venus(1.5f, 36, 18);
 Sphere earth(1.575f, 36, 18);
+Sphere moon(30.073f, 36, 18);
 Sphere mars(0.815f, 36, 18);
 Sphere jupiter(3.517f, 36, 18);
 Sphere saturn(2.965f, 36, 18);
@@ -136,31 +143,31 @@ Sphere neptune(1.218f, 36, 18);
 float sunRot = 0;
 
 float mercuryRot = 0;
-const float mercuryRevolve = 4.787f;
+float mercuryRevolve = 4.787f;
 
 float venusRot = 0;
-const float venusRevolve = 3.502f;
+float venusRevolve = 3.502f;
 
 float earthRot = 0;
-const float earthRevolve = 2.978f;
+float earthRevolve = 2.978f;
 
 float moonRot = 0;
-const float moonRevolve = 1.023f;
+float moonRevolve = 1.023f;
 
 float marsRot = 0;
-const float marsRevolve = 2.413f;
+float marsRevolve = 2.413f;
 
 float jupiterRot = 0;
-const float jupiterRevolve = 1.306f;
+float jupiterRevolve = 1.306f;
 
 float saturnRot = 0;
-const float saturnRevolve = 0.967f;
+float saturnRevolve = 0.967f;
 
 float uranusRot = 0;
-const float uranusRevolve = 0.683f;
+float uranusRevolve = 0.683f;
 
 float neptuneRot = 0;
-const float neptuneRevolve = 0.547f;
+float neptuneRevolve = 0.547f;
 #pragma endregion
 
 // CSolarSystemView
@@ -264,7 +271,7 @@ int CSolarSystemView::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	GetTextures();
 
 	InitGL();
-	InitGLSL();
+	//InitGLSL();
 
 	return 0;
 }
@@ -311,6 +318,7 @@ void CSolarSystemView::GetTextures() {
 	mercuryTex = LoadTexture("bmp/mercury.bmp", true);
 	venusTex = LoadTexture("bmp/venus.bmp", true);
 	earthTex = LoadTexture("bmp/earth.bmp", true);
+	moonTex = LoadTexture("bmp/moon.bmp", true);
 	marsTex = LoadTexture("bmp/mars.bmp", true);
 	jupiterTex = LoadTexture("bmp/jupiter.bmp", true);
 	saturnTex = LoadTexture("bmp/saturn.bmp", true);
@@ -384,7 +392,7 @@ CSolarSystemDoc* CSolarSystemView::GetDocument() const // 디버그되지 않은
 // Creating OpenGL DC
 void CSolarSystemView::OnTimer(UINT_PTR nIDEvent)
 {
-	if (true) {
+	if (isTimeGoing) {
 		sunRot += 0.8;
 		mercuryRot += 0.3;
 		venusRot += 0.18;
@@ -395,6 +403,16 @@ void CSolarSystemView::OnTimer(UINT_PTR nIDEvent)
 		saturnRot += 0.687;
 		uranusRot += 0.259;
 		neptuneRot += 0.268;
+
+		mercuryRevolve += 4.787f;
+		venusRevolve += 3.502f;
+		earthRevolve += 2.978f;
+		moonRevolve += 1.023f;
+		marsRevolve += 2.413f;
+		jupiterRevolve += 1.306f;
+		saturnRevolve += 0.967f;
+		uranusRevolve += 0.683f;
+		neptuneRevolve += 0.547f;
 	}
 	Invalidate(FALSE);
 	CView::OnTimer(nIDEvent);
@@ -411,123 +429,141 @@ void CSolarSystemView::OnSize(UINT nType, int cx, int cy)
 #pragma region //Init_Funcs
 void CSolarSystemView::InitGL()
 {
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Color Buffer 초기값 초기화
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);	// Color Buffer 초기값 초기화
 	glClear(GL_COLOR_BUFFER_BIT);
-	glEnable(GL_DEPTH_TEST); // Fragment Shader 수행 전 Depth Buffer 에 값을 저장할 Fragment 를 미리 선별하는 Depth Testing 실행
-	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST); // Color 와 Texture 의 보간 작업에 대해 GL_NICEST, 품질 우선으로 작업하도록 권고
+	glEnable(GL_DEPTH_TEST);				// Fragment Shader 수행 전 Depth Buffer 에 값을 저장할 Fragment 를 미리 선별하는 Depth Testing 실행
+	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);	// Color 와 Texture 의 보간 작업에 대해 GL_NICEST, 품질 우선으로 작업하도록 권고
 	glEnable(GL_LIGHTING);
 	glEnable(GL_TEXTURE_2D);
 	glEnable(GL_CULL_FACE);
 
 	glClearStencil(0);
-	glClearDepth(1.f); // Depth Buffer 초기값 초기화
-	glDepthFunc(GL_LEQUAL); // fragment 의 Depth 값이 Current Depth Buffer와 크기가 같거나 작을 경우 Depth Buffer 에 누적
+	glClearDepth(1.f);						// Depth Buffer 초기값 초기화
+	glDepthFunc(GL_LEQUAL);					// fragment 의 Depth 값이 Current Depth Buffer와 크기가 같거나 작을 경우 Depth Buffer 에 누적
 
 	InitLights();
 
 	GLenum err = glewInit();
 }
 
-bool CSolarSystemView::InitGLSL() {
-	const int MAX_LENGTH = 2048;
-	char log[MAX_LENGTH];
-	int logLength = 0;
-
-	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	shaderProgram = glCreateProgram();
-
-	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-	glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-
-	glCompileShader(vertexShader);
-	glCompileShader(fragmentShader);
-
-	int isVsSuccess, isFsSuccess;
-	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &isVsSuccess);
-	if (isVsSuccess == GL_FALSE) {
-		glGetShaderiv(vertexShader, GL_INFO_LOG_LENGTH, &logLength);
-		glGetShaderInfoLog(vertexShader, MAX_LENGTH, &logLength, log);
-		std::cout << "++++++ Vertex Shader Log +++++\n" << log << std::endl;
-	}
-
-	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &isFsSuccess);
-	if (isFsSuccess == GL_FALSE) {
-		glGetShaderiv(fragmentShader, GL_INFO_LOG_LENGTH, &logLength);
-		glGetShaderInfoLog(fragmentShader, MAX_LENGTH, &logLength, log);
-		std::cout << "++++++ Fragment Shader Log +++++\n" << log << std::endl;
-	}
-
-	glAttachShader(shaderProgram, vertexShader);
-	glAttachShader(shaderProgram, fragmentShader);
-
-	glLinkProgram(shaderProgram);
-
-	glUseProgram(shaderProgram);
-
-	uniformMatrixModelView = glGetUniformLocation(shaderProgram, "matrixModelView");
-	uniformMatrixModelViewProjection = glGetUniformLocation(shaderProgram, "matrixModelViewProjection");
-	uniformMatrixNormal = glGetUniformLocation(shaderProgram, "matrixNormal");
-	uniformLightPosition = glGetUniformLocation(shaderProgram, "lightPosition");
-	uniformLightAmbient = glGetUniformLocation(shaderProgram, "lightAmbient");
-	uniformLightDiffuse = glGetUniformLocation(shaderProgram, "lightDiffuse");
-	uniformLightSpecular = glGetUniformLocation(shaderProgram, "lightSpecular");
-	uniformMaterialAmbient = glGetUniformLocation(shaderProgram, "materialAmbient");
-	uniformMaterialDiffuse = glGetUniformLocation(shaderProgram, "materialDiffuse");
-	uniformMaterialSpecular = glGetUniformLocation(shaderProgram, "materialSpecular");
-	uniformMaterialShininess = glGetUniformLocation(shaderProgram, "materialShininess");
-	uniformMap0 = glGetUniformLocation(shaderProgram, "map0");
-	uniformTextureUsed = glGetUniformLocation(shaderProgram, "textureUsed");
-	attribVertexPosition = glGetAttribLocation(shaderProgram, "vertexPosition");
-	attribVertexNormal = glGetAttribLocation(shaderProgram, "vertexNormal");
-	attribVertexTexCoord = glGetAttribLocation(shaderProgram, "vertexTexCoord");
-
-	float lightPosition[] = { 0, 0, 1, 0 };
-	float lightAmbient[] = { 0.3f, 0.3f, 0.3f, 1 };
-	float lightDiffuse[] = { 0.7f, 0.7f, 0.7f, 1 };
-	float lightSpecular[] = { 1.0f, 1.0f, 1.0f, 1 };
-	float materialAmbient[] = { 0.5f, 0.5f, 0.5f, 1 };
-	float materialDiffuse[] = { 0.7f, 0.7f, 0.7f, 1 };
-	float materialSpecular[] = { 0.4f, 0.4f, 0.4f, 1 };
-	float materialShininess = 16;
-	glUniform4fv(uniformLightPosition, 1, lightPosition);
-	glUniform4fv(uniformLightAmbient, 1, lightAmbient);
-	glUniform4fv(uniformLightDiffuse, 1, lightDiffuse);
-	glUniform4fv(uniformLightSpecular, 1, lightSpecular);
-	glUniform4fv(uniformMaterialAmbient, 1, materialAmbient);
-	glUniform4fv(uniformMaterialDiffuse, 1, materialDiffuse);
-	glUniform4fv(uniformMaterialSpecular, 1, materialSpecular);
-	glUniform1f(uniformMaterialShininess, materialShininess);
-	glUniform1i(uniformMap0, 0);
-	glUniform1i(uniformTextureUsed, 1);
-
-	glUseProgram(0);
-
-	int linkStatus;
-	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &linkStatus);
-	if (linkStatus == GL_FALSE) {
-		glGetProgramiv(shaderProgram, GL_INFO_LOG_LENGTH, &logLength);
-		glGetProgramInfoLog(shaderProgram, MAX_LENGTH, &logLength, log);
-		std::cout << "++++++ GLSL Program Log ++++++\n" << log << std::endl;
-		return false;
-	}
-	else {
-		return true;
-	}
-}
+//bool CSolarSystemView::InitGLSL() {
+//	const int MAX_LENGTH = 2048;
+//	char log[MAX_LENGTH];
+//	int logLength = 0;
+//
+//	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+//	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+//	shaderProgram = glCreateProgram();
+//
+//	glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+//	glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+//
+//	glCompileShader(vertexShader);
+//	glCompileShader(fragmentShader);
+//
+//	int isVsSuccess, isFsSuccess;
+//	glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &isVsSuccess);
+//	if (isVsSuccess == GL_FALSE) {
+//		glGetShaderiv(vertexShader, GL_INFO_LOG_LENGTH, &logLength);
+//		glGetShaderInfoLog(vertexShader, MAX_LENGTH, &logLength, log);
+//		std::cout << "++++++ Vertex Shader Log +++++\n" << log << std::endl;
+//	}
+//
+//	glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &isFsSuccess);
+//	if (isFsSuccess == GL_FALSE) {
+//		glGetShaderiv(fragmentShader, GL_INFO_LOG_LENGTH, &logLength);
+//		glGetShaderInfoLog(fragmentShader, MAX_LENGTH, &logLength, log);
+//		std::cout << "++++++ Fragment Shader Log +++++\n" << log << std::endl;
+//	}
+//
+//	glAttachShader(shaderProgram, vertexShader);
+//	glAttachShader(shaderProgram, fragmentShader);
+//
+//	glLinkProgram(shaderProgram);
+//
+//	glUseProgram(shaderProgram);
+//
+//	uniformMatrixModelView = glGetUniformLocation(shaderProgram, "matrixModelView");
+//	uniformMatrixModelViewProjection = glGetUniformLocation(shaderProgram, "matrixModelViewProjection");
+//	uniformMatrixNormal = glGetUniformLocation(shaderProgram, "matrixNormal");
+//	uniformLightPosition = glGetUniformLocation(shaderProgram, "lightPosition");
+//	uniformLightAmbient = glGetUniformLocation(shaderProgram, "lightAmbient");
+//	uniformLightDiffuse = glGetUniformLocation(shaderProgram, "lightDiffuse");
+//	uniformLightSpecular = glGetUniformLocation(shaderProgram, "lightSpecular");
+//	uniformMaterialAmbient = glGetUniformLocation(shaderProgram, "materialAmbient");
+//	uniformMaterialDiffuse = glGetUniformLocation(shaderProgram, "materialDiffuse");
+//	uniformMaterialSpecular = glGetUniformLocation(shaderProgram, "materialSpecular");
+//	uniformMaterialShininess = glGetUniformLocation(shaderProgram, "materialShininess");
+//	uniformMap0 = glGetUniformLocation(shaderProgram, "map0");
+//	uniformTextureUsed = glGetUniformLocation(shaderProgram, "textureUsed");
+//	attribVertexPosition = glGetAttribLocation(shaderProgram, "vertexPosition");
+//	attribVertexNormal = glGetAttribLocation(shaderProgram, "vertexNormal");
+//	attribVertexTexCoord = glGetAttribLocation(shaderProgram, "vertexTexCoord");
+//
+//	float lightPosition[] = { 0, 0, 1, 0 };
+//	float lightAmbient[] = { 0.3f, 0.3f, 0.3f, 1 };
+//	float lightDiffuse[] = { 0.7f, 0.7f, 0.7f, 1 };
+//	float lightSpecular[] = { 1.0f, 1.0f, 1.0f, 1 };
+//	float materialAmbient[] = { 0.5f, 0.5f, 0.5f, 1 };
+//	float materialDiffuse[] = { 0.7f, 0.7f, 0.7f, 1 };
+//	float materialSpecular[] = { 0.4f, 0.4f, 0.4f, 1 };
+//	float materialShininess = 16;
+//	glUniform4fv(uniformLightPosition, 1, lightPosition);
+//	glUniform4fv(uniformLightAmbient, 1, lightAmbient);
+//	glUniform4fv(uniformLightDiffuse, 1, lightDiffuse);
+//	glUniform4fv(uniformLightSpecular, 1, lightSpecular);
+//	glUniform4fv(uniformMaterialAmbient, 1, materialAmbient);
+//	glUniform4fv(uniformMaterialDiffuse, 1, materialDiffuse);
+//	glUniform4fv(uniformMaterialSpecular, 1, materialSpecular);
+//	glUniform1f(uniformMaterialShininess, materialShininess);
+//	glUniform1i(uniformMap0, 0);
+//	glUniform1i(uniformTextureUsed, 1);
+//
+//	glUseProgram(0);
+//
+//	int linkStatus;
+//	glGetProgramiv(shaderProgram, GL_LINK_STATUS, &linkStatus);
+//	if (linkStatus == GL_FALSE) {
+//		glGetProgramiv(shaderProgram, GL_INFO_LOG_LENGTH, &logLength);
+//		glGetProgramInfoLog(shaderProgram, MAX_LENGTH, &logLength, log);
+//		std::cout << "++++++ GLSL Program Log ++++++\n" << log << std::endl;
+//		return false;
+//	}
+//	else {
+//		return true;
+//	}
+//}
 
 void CSolarSystemView::InitLights() {
-	GLfloat lightKa[] = { .3f, .3f, .3f, 1.0f };
-	GLfloat lightKd[] = { .7f, .7f, .7f, 1.0f };
-	GLfloat lightKs[] = { 1, 1, 1, 1 };
+	glShadeModel(GL_SMOOTH);
+	glEnable(GL_CULL_FACE);
+
+	GLfloat lightKa[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	GLfloat lightKd[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	GLfloat lightKs[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	glPushMatrix();
+	glLoadIdentity();
 	glLightfv(GL_LIGHT0, GL_AMBIENT, lightKa);
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightKd);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, lightKs);
 
-	float lightPos[4] = { 0, 0, 1, 0 };
+	float lightPos[4] = { 0, 0, 1, 0};
 	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 
+	glEnable(GL_LIGHTING);
 	glEnable(GL_LIGHT0);
+	glPopMatrix();
+}
+
+void CSolarSystemView::InitMembers()
+{
+	screenWidth = SCREEN_WIDTH;
+	screenHeight = SCREEN_HEIGHT;
+
+	cameraAngleX = cameraAngleY = 0.0f;
+	cameraDistance = CAMERA_DISTANCE;
+	isTimeGoing = false;
+	timeSpeed = DEFAULT_TIME_SPEED;
 }
 #pragma endregion
 
@@ -643,13 +679,28 @@ GLuint CSolarSystemView::LoadTexture(const char* fileName, bool wrap)
 	return texture;
 }
 
-void CSolarSystemView::InitMembers()
-{
-	screenWidth = SCREEN_WIDTH;
-	screenHeight = SCREEN_HEIGHT;
+void CSolarSystemView::CreateShadow() {
+	unsigned int depthMapFBO;
+	glGenFramebuffers(1, &depthMapFBO);
 
-	cameraAngleX = cameraAngleY = 0.0f;
-	cameraDistance = CAMERA_DISTANCE;
+	const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+
+	unsigned int depthMap;
+	glGenTextures(1, &depthMap);
+	glBindTexture(GL_TEXTURE_2D, depthMap);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+		SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 }
 
 BOOL CSolarSystemView::PreTranslateMessage(MSG* pMsg)
@@ -657,52 +708,72 @@ BOOL CSolarSystemView::PreTranslateMessage(MSG* pMsg)
 	if (pMsg->message == WM_KEYDOWN)
 	{
 		switch (pMsg->wParam) {
+		case VK_F1:
+			isTimeGoing = true;
+			break;
+
+		case VK_F2:
+			isTimeGoing = false;
+			break;
+
 		case VK_LEFT:
-			posX += -0.5f;
+			cameraX += 0.5f;
 			return TRUE;
 			break;
 
 		case VK_RIGHT:
-			posX += 0.5f;
+			cameraX += -0.5f;
 			return TRUE;
 			break;
 
 		case VK_UP:
-			posY += 0.5f;
+			cameraY += -0.5f;
 			return TRUE;
 			break;
 
 		case VK_DOWN:
-			posY += -0.5f;
-			return TRUE;
-			break;
-
-		case VK_F1:
-			cameraAngleY += 0.5f;
-			return TRUE;
-			break;
-
-		case VK_F2:
-			cameraAngleY += -0.5f;
+			cameraY += 0.5f;
 			return TRUE;
 			break;
 
 		case VK_F3:
-			cameraAngleX += 0.5f;
+			cameraAngleY += 0.5f;
 			return TRUE;
 			break;
 
 		case VK_F4:
-			cameraAngleX += -0.5f;
+			cameraAngleY += -0.5f;
 			return TRUE;
 			break;
 
 		case VK_F5:
-			cameraDistance += 0.5f;
+			cameraAngleX += 0.5f;
+			return TRUE;
 			break;
 
 		case VK_F6:
+			cameraAngleX += -0.5f;
+			return TRUE;
+			break;
+
+		case VK_F7:
+			cameraDistance += 0.5f;
+			break;
+
+		case VK_F8:
 			cameraDistance += -0.5f;
+			break;
+
+		case VK_F12:
+			mercuryRevolve	+= 1;
+			venusRevolve	+= 1;
+			earthRevolve	+= 1;
+			moonRevolve		+= 1;
+			marsRevolve		+= 1;
+			jupiterRevolve	+= 1;
+			saturnRevolve	+= 1;
+			uranusRevolve	+= 1;
+			neptuneRevolve	+= 1;
 			break;
 
 		default:
@@ -1363,22 +1434,163 @@ BOOL CSolarSystemView::PreTranslateMessage(MSG* pMsg)
 //}
 
 void CSolarSystemView::Display() {
-	glPushMatrix();
-	glTranslatef(0, 0, -cameraDistance);
+	
+	//glPushMatrix();
+	//	glTranslatef(cameraX, cameraY, -cameraDistance);
+	//	glRotatef(cameraAngleX, 1, 0, 0);
+	//	glRotatef(cameraAngleY, 0, 1, 0);
 
-	glPushMatrix();
-	glRotatef(cameraAngleX, 1, 0, 0);
-	glRotatef(cameraAngleY, 0, 1, 0);
-	glRotatef(-90, 1, 0, 0);
-	glTranslatef(15.0f, 0.0f, 0.0f);
-	glTranslatef(-1.0f, 0.0f, 0.0f);
-	glRotatef(earthRot, 0, 0, 1);
-	glTranslatef(1.0f, 0.0f, 0.0f);
-	glBindTexture(GL_TEXTURE_2D, earthTex);
-	earth.draw(lineColor);
-	glPopMatrix();
-	glBindTexture(GL_TEXTURE_2D, 0);
+	//	// 태양
+	//	glPushMatrix();
+	//		glRotatef(-90, 1, 0, 0);
+	//		glTranslatef(-1.0f, 0.0f, 0.0f);
 
-	glPopMatrix();
+	//		glRotatef(sunRot, 0, 0, 1);
+	//		
 
+	//		glMaterialfv(GL_FRONT, GL_AMBIENT, matAmbient);
+	//		glMaterialfv(GL_FRONT, GL_DIFFUSE, matDiff);
+	//		glMaterialfv(GL_FRONT, GL_SPECULAR, matSpecular);
+	//		glBindTexture(GL_TEXTURE_2D, sunTex);
+	//		sun.draw(lineColor);
+	//		glBindTexture(GL_TEXTURE_2D, 0);
+	//	glPopMatrix();
+
+
+	//	// 수성
+	//	glPushMatrix();
+	//		glRotatef(-90, 1, 0, 0);
+	//		glRotatef(mercuryRevolve, 0, 0, 1);
+	//		glTranslatef(21.7f, 0.0f, 0.0f);
+
+	//		glPushMatrix();
+	//			glRotatef(mercuryRot, 0, 0, 1);
+	//			glBindTexture(GL_TEXTURE_2D, mercuryTex);
+	//			mercury.draw(lineColor);
+	//			glBindTexture(GL_TEXTURE_2D, 0);
+	//		glPopMatrix();
+
+	//	glPopMatrix();
+
+
+	//	// 금성
+	//	glPushMatrix();
+	//		glRotatef(-90, 1, 0, 0);
+	//		glRotatef(venusRevolve, 0, 0, 1);
+	//		glTranslatef(31, 0.0f, 0.0f);
+
+
+	//		glPushMatrix();
+	//			glRotatef(venusRot, 0, 0, 1);
+	//			glBindTexture(GL_TEXTURE_2D, venusTex);
+	//			venus.draw(lineColor);
+	//			glBindTexture(GL_TEXTURE_2D, 0);
+	//		glPopMatrix();
+	//	glPopMatrix();
+
+
+	//	// 지구
+	//	glPushMatrix();
+	//		glRotatef(-90, 1, 0, 0);
+	//		glRotatef(earthRevolve, 0, 0, 1);
+	//		glTranslatef(40, 0.0f, 0.0f);
+
+	//		glPushMatrix();
+	//			glRotatef(earthRot, 0, 0, 1);
+	//			glBindTexture(GL_TEXTURE_2D, earthTex);
+	//			earth.draw(lineColor);
+	//			glBindTexture(GL_TEXTURE_2D, 0);
+
+	//			// 달
+	///*			glPushMatrix();
+	//				glRotatef(-90, 0, 1, 0);
+	//				glRotatef(moonRevolve, 0, 1, 0);
+	//				glTranslatef(0.0f, 3.8f, 0.0f);
+
+	//				glPushMatrix();
+	//					glRotatef(moonRot, 0, 1, 0);
+	//					glBindTexture(GL_TEXTURE_2D, moonTex);
+	//					moon.draw(lineColor);
+	//					glBindTexture(GL_TEXTURE_2D, 0);
+	//				glPopMatrix();
+	//			glPopMatrix();*/
+	//		glPopMatrix();
+	//	glPopMatrix();
+
+
+	//	// 화성
+	//	glPushMatrix();
+	//		glRotatef(-90, 1, 0, 0);
+	//		glRotatef(marsRevolve, 0, 0, 1);
+	//		glTranslatef(45.6f, 0.0f, 0.0f);
+
+	//		glPushMatrix();
+	//			glRotatef(marsRot, 0, 0, 1);
+	//			glBindTexture(GL_TEXTURE_2D, marsTex);
+	//			mars.draw(lineColor);
+	//			glBindTexture(GL_TEXTURE_2D, 0);
+	//		glPopMatrix();
+	//	glPopMatrix();
+
+
+	//	// 목성
+	//	glPushMatrix();
+	//		glRotatef(-90, 1, 0, 0);
+	//		glRotatef(jupiterRevolve, 0, 0, 1);
+	//		glTranslatef(85.0f, 0.0f, 0.0f);
+
+	//		glPushMatrix();
+	//			glRotatef(jupiterRot, 0, 0, 1);
+	//			glBindTexture(GL_TEXTURE_2D, jupiterTex);
+	//			jupiter.draw(lineColor);
+	//			glBindTexture(GL_TEXTURE_2D, 0);
+	//		glPopMatrix();
+	//	glPopMatrix();
+
+
+	//	// 토성
+	//	glPushMatrix();
+	//		glRotatef(-90, 1, 0, 0);
+	//		glRotatef(saturnRevolve, 0, 0, 1);
+	//		glTranslatef(150.0f, 0.0f, 0.0f);
+
+	//		glPushMatrix();
+	//			glRotatef(saturnRot, 0, 0, 1);
+	//			glBindTexture(GL_TEXTURE_2D, saturnTex);
+	//			saturn.draw(lineColor);
+	//			glBindTexture(GL_TEXTURE_2D, 0);
+	//		glPopMatrix();
+	//	glPopMatrix();
+
+
+	//	// 천왕성
+	//	glPushMatrix();
+	//		glRotatef(-90, 1, 0, 0);
+	//		glRotatef(uranusRevolve, 0, 0, 1);
+	//		glTranslatef(300.0f, 0.0f, 0.0f);
+
+	//		glPushMatrix();
+	//			glRotatef(uranusRot, 0, 0, 1);
+	//			glBindTexture(GL_TEXTURE_2D, uranusTex);
+	//			uranus.draw(lineColor);
+	//			glBindTexture(GL_TEXTURE_2D, 0);
+	//		glPopMatrix();
+	//	glPopMatrix();
+
+
+	//	// 해왕성
+	//	glPushMatrix();
+	//		glRotatef(-90, 1, 0, 0);
+	//		glRotatef(neptuneRevolve, 0, 0, 1);
+	//		glTranslatef(450.0f, 0.0f, 0.0f);
+
+	//		glPushMatrix();
+	//			glRotatef(neptuneRot, 0, 0, 1);
+	//			glBindTexture(GL_TEXTURE_2D, neptuneTex);
+	//			neptune.draw(lineColor);
+	//			glBindTexture(GL_TEXTURE_2D, 0);
+	//		glPopMatrix();
+
+	//	glPopMatrix();
+	//glPopMatrix();
 }
