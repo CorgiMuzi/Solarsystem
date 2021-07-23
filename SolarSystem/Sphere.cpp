@@ -69,17 +69,17 @@ void Sphere::buildVerticesSmooth() {
 	float nx, ny, nz, lengthInv = 1.0f / radius;
 	float s, t;
 
-	float longStep = 2 * m_PI / longCount;
-	float latStep = m_PI / latCount;
+	float longStack = 2 * m_PI / longCount;
+	float latStack = m_PI / latCount;
 	float longAngle, latAngle;
 
 	for (int i = 0; i <= latCount; ++i) {
-		latAngle = m_PI / 2 - i * latStep;
+		latAngle = m_PI / 2 - i * latStack;
 		xy = radius * cosf(latAngle);
 		z = radius * sinf(latAngle);
 
 		for (int j = 0; j <= longCount; ++j) {
-			longAngle = j * longStep;
+			longAngle = j * longStack;
 
 			x = xy * cosf(longAngle);
 			y = xy * sinf(longAngle);
@@ -129,17 +129,17 @@ void Sphere::buildVerticesFlat() {
 
 	std::vector<Vertex> tmpVertices;
 
-	float longStep = 2 * m_PI / longCount;
-	float latStep = PI / latCount;
+	float longStack = 2 * m_PI / longCount;
+	float latStack = PI / latCount;
 	float longAngle, latAngle;
 
 	for (int i = 0; i < latCount; ++i) {
-		latAngle = PI / 2 - i * latStep;
+		latAngle = PI / 2 - i * latStack;
 		float xy = radius * cosf(latAngle);
 		float z = radius * sinf(latAngle);
 
 		for (int j = 0; j <= longCount; ++j) {
-			longAngle = j * longStep;
+			longAngle = j * longStack;
 
 			Vertex vertex;
 			vertex.x = xy * cosf(longAngle);
@@ -329,9 +329,8 @@ std::vector<float> Sphere::computeFaceNormal(float x1, float y1, float z1,
 	return normal;
 }
 
-void Sphere::draw(const float lineColor[4]) const
+void Sphere::draw() const
 {
-	// interleaved array
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_NORMAL_ARRAY);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
